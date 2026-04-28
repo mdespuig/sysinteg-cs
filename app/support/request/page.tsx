@@ -35,6 +35,23 @@ import { Header } from "@/components/header"
 import { inquiryTypes, relationshipOptions, type InquiryType } from "@/lib/inquiry-data"
 import { toast } from "sonner"
 
+const PHONE_PREFIX = "+639"
+const PHONE_DIGIT_LIMIT = 9
+
+const extractPhoneDigits = (value: string) => {
+  const digits = value.replace(/\D/g, "")
+
+  if (digits.startsWith("639") && digits.length >= 12) {
+    return digits.slice(3, 12)
+  }
+
+  if (digits.startsWith("09") && digits.length >= 11) {
+    return digits.slice(2, 11)
+  }
+
+  return digits.slice(0, PHONE_DIGIT_LIMIT)
+}
+
 interface FormData {
   inquiryType: InquiryType | ""
   patientName: string
@@ -63,6 +80,35 @@ export default function RequestInquiryPage() {
     details: "",
   })
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
+
+  const handleContactNumberChange = (rawValue: string) => {
+    if (rawValue && !/^\d+$/.test(rawValue)) {
+      toast.error("Contact number can only contain numerical characters")
+      return
+    }
+
+    if (rawValue.length > PHONE_DIGIT_LIMIT) {
+      toast.error("Contact number can only contain 9 digits after +639")
+      return
+    }
+
+    updateField("contactNumber", rawValue)
+  }
+
+  const handleContactNumberBlur = () => {
+    if (!formData.contactNumber) return
+
+    if (formData.contactNumber.length !== PHONE_DIGIT_LIMIT) {
+      const message = "Contact number must contain exactly 9 digits after +639"
+      setErrors((prev) => ({ ...prev, contactNumber: message }))
+      toast.error(message)
+      return
+    }
+
+    if (errors.contactNumber) {
+      setErrors((prev) => ({ ...prev, contactNumber: undefined }))
+    }
+  }
 
   const clearAutoFilledFields = () => {
     setFormData((prev) => ({
@@ -120,7 +166,7 @@ export default function RequestInquiryPage() {
 
       setFormData((prev) => ({
         ...prev,
-        contactNumber,
+        contactNumber: extractPhoneDigits(contactNumber),
         email,
         address,
       }))
@@ -152,6 +198,8 @@ export default function RequestInquiryPage() {
     }
     if (!formData.contactNumber.trim()) {
       newErrors.contactNumber = "Contact number is required"
+    } else if (!/^\d{9}$/.test(formData.contactNumber)) {
+      newErrors.contactNumber = "Contact number must contain exactly 9 digits after +639"
     }
     if (!formData.email.trim()) {
       newErrors.email = "Email is required"
@@ -403,15 +451,25 @@ export default function RequestInquiryPage() {
                       <Phone className="h-4 w-4 text-muted-foreground" />
                       Contact Number
                     </Label>
-                    <Input
-                      id="contact-number"
-                      type="tel"
-                      placeholder="+63 9XX XXX XXXX"
-                      value={formData.contactNumber}
-                      onChange={(e) => updateField("contactNumber", e.target.value)}
-                      disabled={fillInformationFields || isLoadingProfileInfo}
-                      className={errors.contactNumber ? "border-destructive" : ""}
-                    />
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-[#006AEE]">
+                        {PHONE_PREFIX}
+                      </span>
+                      <Input
+                        id="contact-number"
+                        type="tel"
+                        inputMode="numeric"
+                        placeholder="912345678"
+                        value={formData.contactNumber}
+                        onChange={(e) => handleContactNumberChange(e.target.value)}
+                        onBlur={handleContactNumberBlur}
+                        minLength={PHONE_DIGIT_LIMIT}
+                        maxLength={PHONE_DIGIT_LIMIT}
+                        pattern="[0-9]{9}"
+                        disabled={fillInformationFields || isLoadingProfileInfo}
+                        className={`pl-20 ${errors.contactNumber ? "border-destructive" : ""}`}
+                      />
+                    </div>
                     {errors.contactNumber && (
                       <p className="text-sm text-destructive">{errors.contactNumber}</p>
                     )}

@@ -18,6 +18,16 @@ import {
   Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
@@ -43,6 +53,9 @@ export default function RecordsPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [page, setPage] = useState(1)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([])
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const isAdmin = (session?.user as any)?.role === "admin"
 
@@ -155,6 +168,8 @@ export default function RecordsPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / size))
   const safePage = Math.min(page, totalPages)
   const pageItems = filtered.slice((safePage - 1) * size, safePage * size)
+  const selectedCount = selectedIds.length
+  const selectedTotal = filtered.length
   const summary = useMemo(() => {
     return items.reduce(
       (acc, item) => {
@@ -187,33 +202,31 @@ export default function RecordsPage() {
     setSelectedIds((current) => current.filter((id) => filtered.some((item) => item.id === id)))
   }, [filtered])
 
-  const handleDelete = async (id: string) => {
-    if (!confirm(`Delete inquiry ${id}?`)) return
-    try {
-      const res = await fetch("/api/v1/inquiries/admin", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inquiryId: id }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Delete failed")
-      toast.success("Inquiry deleted")
-      await loadData()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Delete failed")
-    }
-  }
-
-  const handleBulkDelete = async () => {
-    if (selectedIds.length === 0) {
+  const openDeleteDialog = (ids: string[]) => {
+    if (ids.length === 0) {
       toast.error("Select at least one inquiry to delete")
       return
     }
-    if (!confirm(`Delete ${selectedIds.length} selected inquiry(s)?`)) return
 
+    setDeleteTargetIds(ids)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDelete = (id: string) => {
+    openDeleteDialog([id])
+  }
+
+  const handleBulkDelete = () => {
+    openDeleteDialog(selectedIds)
+  }
+
+  const confirmDelete = async () => {
+    if (deleteTargetIds.length === 0) return
+
+    setIsDeleting(true)
     try {
       await Promise.all(
-        selectedIds.map((id) =>
+        deleteTargetIds.map((id) =>
           fetch("/api/v1/inquiries/admin", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
@@ -221,11 +234,15 @@ export default function RecordsPage() {
           })
         )
       )
-      toast.success("Selected inquiries deleted")
-      setSelectedIds([])
+      toast.success(deleteTargetIds.length === 1 ? "Inquiry deleted" : "Selected inquiries deleted")
+      setSelectedIds((current) => current.filter((id) => !deleteTargetIds.includes(id)))
+      setDeleteDialogOpen(false)
+      setDeleteTargetIds([])
       await loadData()
     } catch (error) {
-      toast.error("Failed to delete selected inquiries")
+      toast.error(error instanceof Error ? error.message : "Delete failed")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -451,17 +468,64 @@ export default function RecordsPage() {
             </div>
           </div>
 
-          <div className="mt-8 flex items-center justify-end gap-3 text-sm">
-            <span className="text-slate-600">Page {safePage} of {totalPages}</span>
-            <Button variant="ghost" size="icon" className="cursor-pointer" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="cursor-pointer" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+          <div className="mt-8 flex items-center justify-between gap-3 text-sm">
+            {selectedCount > 0 ? (
+              <span className="text-slate-600">
+                Selected {selectedCount} out of {selectedTotal}
+              </span>
+            ) : (
+              <span />
+            )}
+            <div className="flex items-center gap-3">
+              <span className="text-slate-600">Page {safePage} of {totalPages}</span>
+              <Button variant="ghost" size="icon" className="cursor-pointer" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="cursor-pointer" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
+
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open)
+          if (!open && !isDeleting) {
+            setDeleteTargetIds([])
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deleteTargetIds.length === 1 ? "inquiry" : "inquiries"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTargetIds.length === 1
+                ? `This will permanently delete inquiry ${deleteTargetIds[0]}. This action cannot be undone.`
+                : `This will permanently delete ${deleteTargetIds.length} selected inquiries. This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer" disabled={isDeleting}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="cursor-pointer bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault()
+                void confirmDelete()
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

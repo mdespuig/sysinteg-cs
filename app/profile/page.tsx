@@ -42,6 +42,30 @@ interface ProfileData {
   emergencyContact: EmergencyContact
 }
 
+const PHONE_PREFIX = "+639"
+const PHONE_DIGIT_LIMIT = 9
+const PHONE_PREFIX_DIGITS = PHONE_PREFIX.replace(/\D/g, "")
+const DUPLICATE_CONTACT_ERROR = "Personal and emergency contact numbers must be different"
+
+const extractPhoneDigits = (value: string) => {
+  const digits = value.replace(/\D/g, "")
+
+  if (
+    digits.startsWith(PHONE_PREFIX_DIGITS) &&
+    digits.length === PHONE_PREFIX_DIGITS.length + PHONE_DIGIT_LIMIT
+  ) {
+    return digits.slice(PHONE_PREFIX_DIGITS.length, PHONE_PREFIX_DIGITS.length + PHONE_DIGIT_LIMIT)
+  }
+
+  if (digits.startsWith("09") && digits.length === 11) {
+    return digits.slice(2, 2 + PHONE_DIGIT_LIMIT)
+  }
+
+  return digits.slice(0, PHONE_DIGIT_LIMIT)
+}
+
+const isCompletePhoneDigits = (value: string) => /^\d{9}$/.test(value)
+
 const createDefaultAvatarDataUrl = (label: string) => {
   const initial = (label.trim().charAt(0).toUpperCase() || "U").replace(/&/g, "&amp;")
   const svg = `
@@ -60,6 +84,23 @@ const createDefaultAvatarDataUrl = (label: string) => {
   `
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
+
+const normalizeProfileData = (profile?: Partial<ProfileData> | null): ProfileData => ({
+  profileImage: profile?.profileImage ?? null,
+  personalData: {
+    firstName: profile?.personalData?.firstName ?? "",
+    lastName: profile?.personalData?.lastName ?? "",
+    birthdate: profile?.personalData?.birthdate ?? "",
+    contactNumber: extractPhoneDigits(profile?.personalData?.contactNumber ?? ""),
+    address: profile?.personalData?.address ?? "",
+  },
+  emergencyContact: {
+    firstName: profile?.emergencyContact?.firstName ?? "",
+    lastName: profile?.emergencyContact?.lastName ?? "",
+    contactNumber: extractPhoneDigits(profile?.emergencyContact?.contactNumber ?? ""),
+    address: profile?.emergencyContact?.address ?? "",
+  },
+})
 
 export default function ProfilePage() {
   const { data: session, status } = useSession()
@@ -131,22 +172,7 @@ export default function ProfilePage() {
               detail: { userId: session.user.id, profileImage: nextImage },
             })
           )
-          setProfileData({
-            profileImage: nextImage,
-            personalData: {
-              firstName: data.data.personalData?.firstName ?? "",
-              lastName: data.data.personalData?.lastName ?? "",
-              birthdate: data.data.personalData?.birthdate ?? "",
-              contactNumber: data.data.personalData?.contactNumber ?? "",
-              address: data.data.personalData?.address ?? "",
-            },
-            emergencyContact: {
-              firstName: data.data.emergencyContact?.firstName ?? "",
-              lastName: data.data.emergencyContact?.lastName ?? "",
-              contactNumber: data.data.emergencyContact?.contactNumber ?? "",
-              address: data.data.emergencyContact?.address ?? "",
-            },
-          })
+          setProfileData(normalizeProfileData({ ...data.data, profileImage: nextImage }))
         }
       } catch (error) {
         console.error("Failed to load profile:", error)
@@ -221,6 +247,102 @@ export default function ProfilePage() {
     }
   }
 
+  const handlePhoneNumberChange = (
+    section: "personalData" | "emergencyContact",
+    value: string
+  ) => {
+    const otherSection = section === "personalData" ? "emergencyContact" : "personalData"
+    const digitsOnly = value.replace(/\D/g, "")
+    const normalizedDigits = extractPhoneDigits(value)
+    const otherContactNumber = profileData[otherSection].contactNumber.trim()
+
+    if (value && digitsOnly.length !== value.length) {
+      toast.error("Contact number can only contain numerical characters")
+    } else if (digitsOnly.length > PHONE_DIGIT_LIMIT) {
+      toast.error("Contact number can only contain 9 digits after +639")
+    }
+
+    if (
+      normalizedDigits.length === PHONE_DIGIT_LIMIT &&
+      otherContactNumber.length === PHONE_DIGIT_LIMIT &&
+      normalizedDigits === otherContactNumber
+    ) {
+      toast.error(DUPLICATE_CONTACT_ERROR)
+      setErrors((prev) => ({
+        ...prev,
+        [section]: { ...prev[section], contactNumber: DUPLICATE_CONTACT_ERROR },
+        [otherSection]: { ...prev[otherSection], contactNumber: DUPLICATE_CONTACT_ERROR },
+      }))
+      return
+    }
+
+    setProfileData((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        contactNumber: normalizedDigits,
+      },
+    }))
+
+    setErrors((prev) => {
+      const nextErrors = {
+        ...prev,
+        [section]: { ...prev[section], contactNumber: undefined },
+        [otherSection]: { ...prev[otherSection] },
+      }
+
+      if (nextErrors[otherSection].contactNumber === DUPLICATE_CONTACT_ERROR) {
+        nextErrors[otherSection].contactNumber = undefined
+      }
+
+      return nextErrors
+    })
+  }
+
+  const handlePhoneNumberBlur = (section: "personalData" | "emergencyContact") => {
+    const otherSection = section === "personalData" ? "emergencyContact" : "personalData"
+    const contactNumber = profileData[section].contactNumber.trim()
+    const otherContactNumber = profileData[otherSection].contactNumber.trim()
+    if (!contactNumber) return
+
+    if (contactNumber.length !== PHONE_DIGIT_LIMIT) {
+      const message = "Contact number must contain exactly 9 digits after +639"
+      toast.error(message)
+      setErrors((prev) => ({
+        ...prev,
+        [section]: { ...prev[section], contactNumber: message },
+      }))
+      return
+    }
+
+    if (
+      otherContactNumber.length === PHONE_DIGIT_LIMIT &&
+      contactNumber === otherContactNumber
+    ) {
+      toast.error(DUPLICATE_CONTACT_ERROR)
+      setErrors((prev) => ({
+        ...prev,
+        [section]: { ...prev[section], contactNumber: DUPLICATE_CONTACT_ERROR },
+        [otherSection]: { ...prev[otherSection], contactNumber: DUPLICATE_CONTACT_ERROR },
+      }))
+      return
+    }
+
+    setErrors((prev) => {
+      const nextErrors = {
+        ...prev,
+        [section]: { ...prev[section], contactNumber: undefined },
+        [otherSection]: { ...prev[otherSection] },
+      }
+
+      if (nextErrors[otherSection].contactNumber === DUPLICATE_CONTACT_ERROR) {
+        nextErrors[otherSection].contactNumber = undefined
+      }
+
+      return nextErrors
+    })
+  }
+
   const validateForm = () => {
     if (isAdmin) {
       setErrors({
@@ -230,6 +352,7 @@ export default function ProfilePage() {
       return true
     }
 
+    let phoneErrorMessage: string | null = null
     const newErrors = {
       personalData: {} as Partial<Record<keyof PersonalData, string>>,
       emergencyContact: {} as Partial<Record<keyof EmergencyContact, string>>,
@@ -238,15 +361,38 @@ export default function ProfilePage() {
     if (!profileData.personalData.firstName.trim()) newErrors.personalData.firstName = "First name is required"
     if (!profileData.personalData.lastName.trim()) newErrors.personalData.lastName = "Last name is required"
     if (!profileData.personalData.birthdate) newErrors.personalData.birthdate = "Birthdate is required"
-    if (!profileData.personalData.contactNumber.trim()) newErrors.personalData.contactNumber = "Contact number is required"
+    if (!profileData.personalData.contactNumber.trim()) {
+      newErrors.personalData.contactNumber = "Contact number is required"
+    } else if (!isCompletePhoneDigits(profileData.personalData.contactNumber)) {
+      newErrors.personalData.contactNumber = "Contact number must contain exactly 9 digits after +639"
+      phoneErrorMessage = "Contact number must contain exactly 9 digits after +639"
+    }
     if (!profileData.personalData.address.trim()) newErrors.personalData.address = "Address is required"
 
     if (!profileData.emergencyContact.firstName.trim()) newErrors.emergencyContact.firstName = "First name is required"
     if (!profileData.emergencyContact.lastName.trim()) newErrors.emergencyContact.lastName = "Last name is required"
-    if (!profileData.emergencyContact.contactNumber.trim()) newErrors.emergencyContact.contactNumber = "Contact number is required"
+    if (!profileData.emergencyContact.contactNumber.trim()) {
+      newErrors.emergencyContact.contactNumber = "Contact number is required"
+    } else if (!isCompletePhoneDigits(profileData.emergencyContact.contactNumber)) {
+      newErrors.emergencyContact.contactNumber = "Contact number must contain exactly 9 digits after +639"
+      phoneErrorMessage = "Contact number must contain exactly 9 digits after +639"
+    }
     if (!profileData.emergencyContact.address.trim()) newErrors.emergencyContact.address = "Address is required"
 
+    if (
+      isCompletePhoneDigits(profileData.personalData.contactNumber) &&
+      isCompletePhoneDigits(profileData.emergencyContact.contactNumber) &&
+      profileData.personalData.contactNumber === profileData.emergencyContact.contactNumber
+    ) {
+      newErrors.personalData.contactNumber = DUPLICATE_CONTACT_ERROR
+      newErrors.emergencyContact.contactNumber = DUPLICATE_CONTACT_ERROR
+      phoneErrorMessage = DUPLICATE_CONTACT_ERROR
+    }
+
     setErrors(newErrors)
+    if (phoneErrorMessage) {
+      toast.error(phoneErrorMessage)
+    }
     return Object.keys(newErrors.personalData).length === 0 && Object.keys(newErrors.emergencyContact).length === 0
   }
 
@@ -257,20 +403,30 @@ export default function ProfilePage() {
     setIsSaving(true)
 
     try {
+      const payload = {
+        userId: session?.user?.id,
+        isAdmin,
+        profileImage: profileData.profileImage,
+        personalData: {
+          ...profileData.personalData,
+          contactNumber: `${PHONE_PREFIX}${profileData.personalData.contactNumber}`,
+        },
+        emergencyContact: {
+          ...profileData.emergencyContact,
+          contactNumber: `${PHONE_PREFIX}${profileData.emergencyContact.contactNumber}`,
+        },
+      }
+
       const response = await fetch("/api/v1/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: session?.user?.id,
-          isAdmin,
-          ...profileData,
-        }),
+        body: JSON.stringify(payload),
       })
 
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || "Failed to save profile")
 
-      if (data.data) setProfileData(data.data)
+      if (data.data) setProfileData(normalizeProfileData(data.data))
       if (session?.user?.id) {
         const nextImage = data.data?.profileImage ?? null
         window.localStorage.setItem(`profile-avatar:${session.user.id}`, nextImage ?? "")
@@ -414,7 +570,24 @@ export default function ProfilePage() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="personal-contact">Contact Number</Label>
-                        <Input id="personal-contact" type="tel" placeholder="+63 9XX XXX XXXX" value={profileData.personalData.contactNumber} onChange={(e) => updatePersonalData("contactNumber", e.target.value)} className={errors.personalData.contactNumber ? "border-destructive" : ""} />
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-[#006AEE]">
+                            {PHONE_PREFIX}
+                          </span>
+                          <Input
+                            id="personal-contact"
+                            type="tel"
+                            inputMode="numeric"
+                            placeholder="912345678"
+                            value={profileData.personalData.contactNumber}
+                            onChange={(e) => handlePhoneNumberChange("personalData", e.target.value)}
+                            onBlur={() => handlePhoneNumberBlur("personalData")}
+                            minLength={PHONE_DIGIT_LIMIT}
+                            maxLength={PHONE_DIGIT_LIMIT}
+                            pattern="[0-9]{9}"
+                            className={`pl-20 ${errors.personalData.contactNumber ? "border-destructive" : ""}`}
+                          />
+                        </div>
                         {errors.personalData.contactNumber && <p className="text-sm text-destructive">{errors.personalData.contactNumber}</p>}
                       </div>
                     </div>
@@ -446,7 +619,24 @@ export default function ProfilePage() {
                       </div>
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="emergency-contact">Contact Number</Label>
-                        <Input id="emergency-contact" type="tel" placeholder="+63 9XX XXX XXXX" value={profileData.emergencyContact.contactNumber} onChange={(e) => updateEmergencyContact("contactNumber", e.target.value)} className={errors.emergencyContact.contactNumber ? "border-destructive" : ""} />
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-[#006AEE]">
+                            {PHONE_PREFIX}
+                          </span>
+                          <Input
+                            id="emergency-contact"
+                            type="tel"
+                            inputMode="numeric"
+                            placeholder="912345678"
+                            value={profileData.emergencyContact.contactNumber}
+                            onChange={(e) => handlePhoneNumberChange("emergencyContact", e.target.value)}
+                            onBlur={() => handlePhoneNumberBlur("emergencyContact")}
+                            minLength={PHONE_DIGIT_LIMIT}
+                            maxLength={PHONE_DIGIT_LIMIT}
+                            pattern="[0-9]{9}"
+                            className={`pl-20 ${errors.emergencyContact.contactNumber ? "border-destructive" : ""}`}
+                          />
+                        </div>
                         {errors.emergencyContact.contactNumber && <p className="text-sm text-destructive">{errors.emergencyContact.contactNumber}</p>}
                       </div>
                     </div>

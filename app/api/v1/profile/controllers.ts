@@ -3,9 +3,33 @@ import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/db"
 
 const COLLECTION = "profile"
+const PHONE_PREFIX = "+639"
+const PHONE_DIGIT_LIMIT = 9
+const PHONE_PREFIX_DIGITS = PHONE_PREFIX.replace(/\D/g, "")
 
 const isValidObjectId = (value: string) =>
   ObjectId.isValid(value) && String(new ObjectId(value)) === value
+
+const normalizePhoneNumber = (value: unknown) => {
+  if (typeof value !== "string") return null
+
+  const digits = value.replace(/\D/g, "")
+  if (digits.length === PHONE_DIGIT_LIMIT && /^\d{9}$/.test(digits)) {
+    return `${PHONE_PREFIX}${digits}`
+  }
+
+  if (
+    digits.length === PHONE_PREFIX_DIGITS.length + PHONE_DIGIT_LIMIT &&
+    digits.startsWith(PHONE_PREFIX_DIGITS)
+  ) {
+    const phoneDigits = digits.slice(-PHONE_DIGIT_LIMIT)
+    if (/^\d{9}$/.test(phoneDigits)) {
+      return `${PHONE_PREFIX}${phoneDigits}`
+    }
+  }
+
+  return null
+}
 
 export async function getProfile(request: NextRequest) {
   try {
@@ -72,6 +96,16 @@ export async function updateProfile(request: NextRequest) {
       )
     }
 
+    const normalizedPersonalContactNumber = normalizePhoneNumber(personalData?.contactNumber)
+    const normalizedEmergencyContactNumber = normalizePhoneNumber(emergencyContact?.contactNumber)
+
+    if (!isAdmin && (!normalizedPersonalContactNumber || !normalizedEmergencyContactNumber)) {
+      return NextResponse.json(
+        { error: "Contact numbers must contain exactly 9 digits after +639" },
+        { status: 400 }
+      )
+    }
+
     const now = new Date()
 
     const setData: Record<string, unknown> = {
@@ -82,8 +116,14 @@ export async function updateProfile(request: NextRequest) {
     }
 
     if (!isAdmin) {
-      setData.personalData = personalData
-      setData.emergencyContact = emergencyContact
+      setData.personalData = {
+        ...personalData,
+        contactNumber: normalizedPersonalContactNumber,
+      }
+      setData.emergencyContact = {
+        ...emergencyContact,
+        contactNumber: normalizedEmergencyContactNumber,
+      }
     }
 
     await profiles.updateOne(

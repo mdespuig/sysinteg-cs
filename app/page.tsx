@@ -268,9 +268,14 @@ export default function LandingPage() {
               </div>
               <span className="font-semibold text-foreground">MediCare Health</span>
             </div>
-            <p className="text-center text-sm text-muted-foreground">
-              2026 MediCare Health System. All rights reserved.
-            </p>
+            <div className="text-center md:text-right">
+              <p className="text-sm text-muted-foreground">
+                2026 MediCare Health System. All rights reserved.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Cobilla, Despuig, Esmabe, Mapa | ITMC321 - ZT32
+              </p>
+            </div>
           </div>
         </div>
       </footer>
