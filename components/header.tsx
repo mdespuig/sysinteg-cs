@@ -1,8 +1,10 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useSession, signOut } from "next-auth/react"
 import { HeartPulse, LogOut, User } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -19,7 +21,10 @@ type HeaderProps = {
 
 export function Header({ showRecordsNav = false }: HeaderProps) {
   const { data: session } = useSession()
-  const isAdmin = (session?.user as any)?.role === "admin"
+  const role = (session?.user as any)?.role
+  const isPrivilegedUser = role === "admin" || role === "staff"
+  const isAdmin = role === "admin"
+  const [profileImage, setProfileImage] = useState<string | null>(null)
 
   const handleLogout = async () => {
     try {
@@ -31,7 +36,47 @@ export function Header({ showRecordsNav = false }: HeaderProps) {
     }
   }
 
-  // Get avatar letter from username
+  useEffect(() => {
+    const userId = session?.user?.id
+    if (!userId) {
+      setProfileImage(null)
+      return
+    }
+
+    const cacheKey = `profile-avatar:${userId}`
+    const cachedImage = window.localStorage.getItem(cacheKey)
+    setProfileImage(cachedImage || null)
+
+    const syncAvatar = (event: Event) => {
+      const customEvent = event as CustomEvent<{ userId?: string; profileImage?: string | null }>
+      if (customEvent.detail?.userId === userId) {
+        setProfileImage(customEvent.detail.profileImage ?? null)
+      }
+    }
+
+    window.addEventListener("profile-avatar-updated", syncAvatar)
+
+    const loadAvatar = async () => {
+      try {
+        const response = await fetch(`/api/v1/profile?userId=${userId}`, {
+          cache: "no-store",
+        })
+        const data = await response.json()
+        const nextImage = response.ok ? data.data?.profileImage ?? null : null
+        setProfileImage(nextImage)
+        window.localStorage.setItem(cacheKey, nextImage ?? "")
+      } catch (error) {
+        console.error("Failed to load header avatar:", error)
+      }
+    }
+
+    loadAvatar()
+
+    return () => {
+      window.removeEventListener("profile-avatar-updated", syncAvatar)
+    }
+  }, [session?.user?.id])
+
   const avatarLetter = session?.user?.name?.[0]?.toUpperCase() || "U"
 
   return (
@@ -45,12 +90,17 @@ export function Header({ showRecordsNav = false }: HeaderProps) {
         </Link>
 
         <nav className="hidden items-center justify-center gap-8 lg:gap-10 md:flex justify-self-center">
-          {isAdmin ? (
-            showRecordsNav ? (
-              <Link href="/dashboard/records" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-                Medical Records
+          {isPrivilegedUser ? (
+            <>
+              <Link href="/dashboard" className="whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                Dashboard
               </Link>
-            ) : null
+              {isAdmin && showRecordsNav ? (
+                <Link href="/dashboard/records" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                  Medical Records
+                </Link>
+              ) : null}
+            </>
           ) : (
             <>
               <Link href="/support" className="whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
@@ -70,13 +120,18 @@ export function Header({ showRecordsNav = false }: HeaderProps) {
           {session?.user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-muted transition-colors cursor-pointer">
-                  <div
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-white font-semibold text-sm"
-                    style={{ backgroundColor: "#006AEE" }}
-                  >
-                    {avatarLetter}
-                  </div>
+                <button className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-[#006AEE]/10 hover:text-foreground cursor-pointer">
+                  <Avatar className="h-8 w-8">
+                    {profileImage ? (
+                      <AvatarImage src={profileImage} alt="Profile avatar" className="h-full w-full object-cover" />
+                    ) : (
+                      <AvatarFallback
+                        className="bg-[#006AEE] text-sm font-semibold text-white"
+                      >
+                        {avatarLetter}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
                   <span className="text-sm font-medium text-foreground hidden sm:inline">
                     {session.user.name}
                   </span>
@@ -84,7 +139,10 @@ export function Header({ showRecordsNav = false }: HeaderProps) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="cursor-pointer flex items-center gap-2">
+                  <Link
+                    href="/profile"
+                    className="cursor-pointer flex items-center gap-2 data-[highlighted]:bg-[#006AEE]/10 data-[highlighted]:text-foreground hover:bg-[#006AEE]/10 hover:text-foreground"
+                  >
                     <User className="h-4 w-4" />
                     Profile
                   </Link>
@@ -92,7 +150,7 @@ export function Header({ showRecordsNav = false }: HeaderProps) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleLogout}
-                  className="cursor-pointer flex items-center gap-2 text-red-600"
+                  className="cursor-pointer flex items-center gap-2 text-red-600 data-[highlighted]:bg-[#006AEE]/10 data-[highlighted]:text-red-600 hover:bg-[#006AEE]/10 hover:text-red-600"
                 >
                   <LogOut className="h-4 w-4" />
                   Logout

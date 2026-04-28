@@ -175,7 +175,7 @@ export default function SignupPage() {
                   Role
                 </Label>
                 <Select value={formData.role} onValueChange={handleRoleChange}>
-                  <SelectTrigger className="h-10" disabled={isLoading}>
+                  <SelectTrigger className="h-10 w-full" disabled={isLoading}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -188,7 +188,7 @@ export default function SignupPage() {
 
               <Button
                 type="submit"
-                className="w-full h-10 bg-primary hover:bg-primary/90 mt-6"
+                className="w-full h-10 cursor-pointer bg-primary hover:bg-primary/90 mt-6"
                 disabled={isLoading}
               >
                 {isLoading ? (

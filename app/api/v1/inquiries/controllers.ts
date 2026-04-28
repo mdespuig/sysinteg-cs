@@ -24,7 +24,7 @@ export async function createInquiry(request: NextRequest) {
       )
     }
 
-    const validTypes = ["appointment", "billing", "medical-records", "prescription", "insurance", "general", "complaint", "feedback"]
+    const validTypes = ["appointment", "billing", "medical-records", "prescription", "insurance", "general", "complaint"]
     if (!validTypes.includes(inquiryType)) {
       return NextResponse.json(
         { error: "Invalid inquiry type" },

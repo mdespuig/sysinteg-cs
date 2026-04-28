@@ -48,8 +48,26 @@ export default function RecordsPage() {
 
   useEffect(() => {
     if (status === "loading") return
-    if (!session) router.replace("/auth/login")
-    else if (!isAdmin) router.replace("/")
+    if (!session) {
+      router.replace("/auth/login")
+      return
+    }
+
+    const role = (session.user as any)?.role
+
+    if (role === "staff") {
+      router.replace("/dashboard")
+      return
+    }
+
+    if (role === "standard") {
+      router.replace("/")
+      return
+    }
+
+    if (!isAdmin) {
+      router.replace("/")
+    }
   }, [status, session, isAdmin, router])
 
   const loadData = useCallback(async (showLoader = false) => {
@@ -221,7 +239,7 @@ export default function RecordsPage() {
       <div className="mx-auto max-w-6xl">
 
         <div className="mt-6 mb-6 flex items-center justify-between">
-          <Button variant="ghost" asChild>
+          <Button variant="ghost" asChild className="cursor-pointer">
             <Link href="/dashboard">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
@@ -263,7 +281,6 @@ export default function RecordsPage() {
                     <SelectItem value="insurance">Insurance</SelectItem>
                     <SelectItem value="general">General</SelectItem>
                     <SelectItem value="complaint">Complaint</SelectItem>
-                    <SelectItem value="feedback">Feedback</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -300,12 +317,12 @@ export default function RecordsPage() {
                 variant="outline"
                 onClick={handleBulkDelete}
                 disabled={selectedIds.length === 0}
-                className="rounded-lg border-blue-500 bg-[#F8FFFE] text-blue-600 hover:bg-[#006AEE] hover:text-[#F8FFFE] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#F8FFFE] disabled:hover:text-blue-600"
+                className="cursor-pointer rounded-lg border-blue-500 bg-[#F8FFFE] text-blue-600 hover:bg-[#006AEE] hover:text-[#F8FFFE] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#F8FFFE] disabled:hover:text-blue-600"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </Button>
-              <Button onClick={() => loadData()} className="rounded-lg bg-[#006AEE] text-[#F8FFFE] border border-[#006AEE] hover:bg-[#F8FFFE] hover:text-[#006AEE] hover:border-[#006AEE]">
+              <Button onClick={() => loadData()} className="cursor-pointer rounded-lg bg-[#006AEE] text-[#F8FFFE] border border-[#006AEE] hover:bg-[#F8FFFE] hover:text-[#006AEE] hover:border-[#006AEE]">
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Refresh
               </Button>
@@ -374,7 +391,7 @@ export default function RecordsPage() {
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => handleDelete(item.id)}
-                          className="rounded-md border border-blue-100 bg-[#F8FFFE] px-3 py-1 text-xs font-medium text-blue-600 hover:border-[#006AEE] hover:bg-[#006AEE] hover:text-[#F8FFFE]"
+                          className="cursor-pointer rounded-md border border-blue-100 bg-[#F8FFFE] px-3 py-1 text-xs font-medium text-blue-600 hover:border-[#006AEE] hover:bg-[#006AEE] hover:text-[#F8FFFE]"
                         >
                           <Trash2 className="inline-block h-3.5 w-3.5" />
                         </button>
@@ -436,10 +453,10 @@ export default function RecordsPage() {
 
           <div className="mt-8 flex items-center justify-end gap-3 text-sm">
             <span className="text-slate-600">Page {safePage} of {totalPages}</span>
-            <Button variant="ghost" size="icon" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            <Button variant="ghost" size="icon" className="cursor-pointer" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+            <Button variant="ghost" size="icon" className="cursor-pointer" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

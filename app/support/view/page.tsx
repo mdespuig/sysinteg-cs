@@ -188,7 +188,7 @@ export default function ViewInquiriesPage() {
                   {formatDate(inquiry.createdAt)}
                 </CardDescription>
               </div>
-              <Button variant="ghost" size="sm" className="shrink-0">
+              <Button variant="ghost" size="sm" className="shrink-0 cursor-pointer">
                 {isExpanded ? (
                   <ChevronUp className="h-5 w-5" />
                 ) : (
@@ -275,7 +275,7 @@ export default function ViewInquiriesPage() {
       <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="mx-auto max-w-3xl">
           <div className="mb-6 flex justify-start">
-            <Button variant="ghost" asChild className="px-0">
+            <Button variant="ghost" asChild className="cursor-pointer px-0">
               <Link href="/support">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Support
@@ -306,7 +306,7 @@ export default function ViewInquiriesPage() {
               <CardContent className="py-12 text-center">
                 <AlertCircle className="mx-auto mb-4 h-12 w-12 text-destructive/70" />
                 <p className="mb-2 font-medium text-destructive">{fetchError}</p>
-                <Button className="mt-4" asChild>
+                <Button className="mt-4 cursor-pointer" asChild>
                   <Link href="/auth/login">
                     <LogIn className="mr-2 h-4 w-4" />
                     Sign In
@@ -340,7 +340,7 @@ export default function ViewInquiriesPage() {
                       onKeyDown={handleKeyDown}
                       className="flex-1 uppercase"
                     />
-                    <Button onClick={handleSearch}>
+                    <Button className="cursor-pointer" onClick={handleSearch}>
                       <Search className="mr-2 h-4 w-4" />
                       Search
                     </Button>
@@ -388,9 +388,9 @@ export default function ViewInquiriesPage() {
                     <div className="flex items-center gap-2">
                       <Filter className="h-4 w-4 text-muted-foreground" />
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-36">
-                          <SelectValue placeholder="Filter status" />
-                        </SelectTrigger>
+                      <SelectTrigger className="w-36 bg-background">
+                        <SelectValue placeholder="Filter status" />
+                      </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Status</SelectItem>
                           <SelectItem value="pending">Pending</SelectItem>
@@ -400,7 +400,7 @@ export default function ViewInquiriesPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button variant="outline" size="sm" asChild>
+                    <Button variant="outline" size="sm" asChild className="cursor-pointer bg-background">
                       <Link href="/support/request">
                         <Plus className="mr-1 h-4 w-4" />
                         New
@@ -423,7 +423,7 @@ export default function ViewInquiriesPage() {
                               statusFilter as Inquiry["status"]
                             )}".`}
                       </p>
-                      <Button asChild>
+                      <Button className="cursor-pointer" asChild>
                         <Link href="/support/request">
                           <Plus className="mr-2 h-4 w-4" />
                           Submit New Inquiry

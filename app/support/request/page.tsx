@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import {
   ArrowLeft,
   Send,
@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -32,6 +33,7 @@ import {
 } from "@/components/ui/select"
 import { Header } from "@/components/header"
 import { inquiryTypes, relationshipOptions, type InquiryType } from "@/lib/inquiry-data"
+import { toast } from "sonner"
 
 interface FormData {
   inquiryType: InquiryType | ""
@@ -44,11 +46,13 @@ interface FormData {
 }
 
 export default function RequestInquiryPage() {
-  const router = useRouter()
+  const { data: session, status } = useSession()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [generatedId, setGeneratedId] = useState("")
   const [copied, setCopied] = useState(false)
+  const [fillInformationFields, setFillInformationFields] = useState(false)
+  const [isLoadingProfileInfo, setIsLoadingProfileInfo] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     inquiryType: "",
     patientName: "",
@@ -59,6 +63,83 @@ export default function RequestInquiryPage() {
     details: "",
   })
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
+
+  const clearAutoFilledFields = () => {
+    setFormData((prev) => ({
+      ...prev,
+      contactNumber: "",
+      email: "",
+      address: "",
+    }))
+    setErrors((prev) => ({
+      ...prev,
+      contactNumber: undefined,
+      email: undefined,
+      address: undefined,
+    }))
+  }
+
+  const handleFillInformationFieldsChange = async (checked: boolean | "indeterminate") => {
+    if (checked !== true) {
+      setFillInformationFields(false)
+      clearAutoFilledFields()
+      return
+    }
+
+    if (status !== "authenticated" || !session?.user?.id) {
+      toast.error("Sign in to fill information fields")
+      return
+    }
+
+    setFillInformationFields(true)
+    setIsLoadingProfileInfo(true)
+
+    try {
+      const response = await fetch(`/api/v1/profile?userId=${session.user.id}`)
+      const data = await response.json().catch(() => ({}))
+
+      const contactNumber =
+        typeof data?.data?.personalData?.contactNumber === "string"
+          ? data.data.personalData.contactNumber.trim()
+          : ""
+      const email =
+        typeof data?.data?.email === "string"
+          ? data.data.email.trim()
+          : ""
+      const address =
+        typeof data?.data?.personalData?.address === "string"
+          ? data.data.personalData.address.trim()
+          : ""
+
+      if (!response.ok || !contactNumber || !email || !address) {
+        toast.error("Complete your profile contact information first")
+        setFillInformationFields(false)
+        clearAutoFilledFields()
+        return
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        contactNumber,
+        email,
+        address,
+      }))
+      setErrors((prev) => ({
+        ...prev,
+        contactNumber: undefined,
+        email: undefined,
+        address: undefined,
+      }))
+      setFillInformationFields(true)
+    } catch (error) {
+      console.error("Failed to load profile information:", error)
+      toast.error("Failed to load profile information")
+      setFillInformationFields(false)
+      clearAutoFilledFields()
+    } finally {
+      setIsLoadingProfileInfo(false)
+    }
+  }
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof FormData, string>> = {}
@@ -173,7 +254,7 @@ export default function RequestInquiryPage() {
                 <p className="mb-2 text-sm text-muted-foreground">Your Inquiry ID</p>
                 <div className="flex items-center justify-center gap-2">
                   <code className="text-xl font-bold tracking-wider text-primary">{generatedId}</code>
-                  <Button variant="ghost" size="sm" onClick={handleCopyId}>
+                  <Button variant="ghost" size="sm" className="cursor-pointer" onClick={handleCopyId}>
                     {copied ? (
                       <CheckCircle className="h-4 w-4 text-online" />
                     ) : (
@@ -238,16 +319,13 @@ export default function RequestInquiryPage() {
                 <Clipboard className="h-5 w-5 text-primary" />
                 Inquiry Form
               </CardTitle>
-              <CardDescription>
-                All fields marked with * are required.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="inquiry-type" className="flex items-center gap-1">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    Type of Inquiry *
+                    Type of Inquiry
                   </Label>
                   <Select
                     value={formData.inquiryType}
@@ -277,7 +355,7 @@ export default function RequestInquiryPage() {
                 <div className="space-y-2">
                   <Label htmlFor="patient-name" className="flex items-center gap-1">
                     <User className="h-4 w-4 text-muted-foreground" />
-                    Name of Patient *
+                    Name of Patient
                   </Label>
                   <Input
                     id="patient-name"
@@ -291,11 +369,39 @@ export default function RequestInquiryPage() {
                   )}
                 </div>
 
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="fill-information-fields"
+                      checked={fillInformationFields}
+                      onCheckedChange={handleFillInformationFieldsChange}
+                      disabled={isLoadingProfileInfo || status === "loading"}
+                      className="mt-1 cursor-pointer"
+                    />
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label
+                          htmlFor="fill-information-fields"
+                          className="cursor-pointer font-medium"
+                        >
+                          Fill information fields
+                        </Label>
+                        {isLoadingProfileInfo && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Automatically use your saved contact number, email address, and address from your profile.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="contact-number" className="flex items-center gap-1">
                       <Phone className="h-4 w-4 text-muted-foreground" />
-                      Contact Number *
+                      Contact Number
                     </Label>
                     <Input
                       id="contact-number"
@@ -303,6 +409,7 @@ export default function RequestInquiryPage() {
                       placeholder="+63 9XX XXX XXXX"
                       value={formData.contactNumber}
                       onChange={(e) => updateField("contactNumber", e.target.value)}
+                      disabled={fillInformationFields || isLoadingProfileInfo}
                       className={errors.contactNumber ? "border-destructive" : ""}
                     />
                     {errors.contactNumber && (
@@ -313,7 +420,7 @@ export default function RequestInquiryPage() {
                   <div className="space-y-2">
                     <Label htmlFor="email" className="flex items-center gap-1">
                       <Mail className="h-4 w-4 text-muted-foreground" />
-                      Email Address *
+                      Email Address
                     </Label>
                     <Input
                       id="email"
@@ -321,6 +428,7 @@ export default function RequestInquiryPage() {
                       placeholder="example@email.com"
                       value={formData.email}
                       onChange={(e) => updateField("email", e.target.value)}
+                      disabled={fillInformationFields || isLoadingProfileInfo}
                       className={errors.email ? "border-destructive" : ""}
                     />
                     {errors.email && (
@@ -332,13 +440,14 @@ export default function RequestInquiryPage() {
                 <div className="space-y-2">
                   <Label htmlFor="address" className="flex items-center gap-1">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
-                    Address *
+                    Address
                   </Label>
                   <Input
                     id="address"
                     placeholder="Enter complete address"
                     value={formData.address}
                     onChange={(e) => updateField("address", e.target.value)}
+                    disabled={fillInformationFields || isLoadingProfileInfo}
                     className={errors.address ? "border-destructive" : ""}
                   />
                   {errors.address && (
@@ -349,7 +458,7 @@ export default function RequestInquiryPage() {
                 <div className="space-y-2">
                   <Label htmlFor="relationship" className="flex items-center gap-1">
                     <Users className="h-4 w-4 text-muted-foreground" />
-                    Relationship to Patient *
+                    Relationship to Patient
                   </Label>
                   <Select
                     value={formData.relationship}
@@ -374,7 +483,7 @@ export default function RequestInquiryPage() {
                 <div className="space-y-2">
                   <Label htmlFor="details" className="flex items-center gap-1">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    Details *
+                    Details
                   </Label>
                   <Textarea
                     id="details"
@@ -393,7 +502,7 @@ export default function RequestInquiryPage() {
                   <Button type="button" variant="outline" className="flex-1" asChild>
                     <Link href="/support">Cancel</Link>
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                  <Button type="submit" className="flex-1 cursor-pointer" disabled={isSubmitting}>
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
