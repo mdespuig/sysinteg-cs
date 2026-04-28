@@ -38,8 +38,13 @@ export async function POST(request: NextRequest) {
 
     const inquiryId = generateInquiryId()
 
-    const session = await getServerSession(authConfig)
-    const userId = (session?.user as any)?.id || null
+    let userId = null
+    try {
+      const session = await getServerSession(authConfig)
+      userId = (session?.user as any)?.id || null
+    } catch {
+      userId = null
+    }
 
     const inquiry = {
       id: inquiryId,
@@ -56,7 +61,7 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     }
 
-    const result = await inquiriesCollection.insertOne(inquiry)
+    await inquiriesCollection.insertOne(inquiry)
 
     return NextResponse.json(
       {
@@ -77,25 +82,40 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authConfig)
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get("id")
 
     const client = await clientPromise
     const db = client.db("healthcare")
     const inquiriesCollection = db.collection("inquiries")
 
-    let inquiries
+    if (id) {
+      const inquiry = await inquiriesCollection.findOne({ id: id.toUpperCase() })
+      if (!inquiry) {
+        return NextResponse.json(
+          { error: "Inquiry not found" },
+          { status: 404 }
+        )
+      }
+      return NextResponse.json(
+        { success: true, data: inquiry },
+        { status: 200 }
+      )
+    }
 
-    if ((session?.user as any)?.id) {
-      inquiries = await inquiriesCollection
-        .find({ userId: (session?.user as any)?.id! })
-        .sort({ createdAt: -1 })
-        .toArray()
-    } else {
+    const session = await getServerSession(authConfig)
+
+    if (!(session?.user as any)?.id) {
       return NextResponse.json(
         { error: "Authentication required to view inquiries" },
         { status: 401 }
       )
     }
+
+    const inquiries = await inquiriesCollection
+      .find({ userId: (session?.user as any)?.id! })
+      .sort({ createdAt: -1 })
+      .toArray()
 
     return NextResponse.json(
       {

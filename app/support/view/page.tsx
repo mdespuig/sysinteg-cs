@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import {
   HeartPulse,
   ArrowLeft,
@@ -19,6 +21,8 @@ import {
   History,
   Plus,
   Filter,
+  Loader2,
+  LogIn,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,7 +41,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  mockInquiries,
   inquiryTypes,
   getStatusColor,
   getStatusLabel,
@@ -45,12 +48,67 @@ import {
 } from "@/lib/inquiry-data"
 
 export default function ViewInquiriesPage() {
+  const { data: session, status } = useSession()
+
+  if (status === "unauthenticated") {
+    redirect("/auth/login")
+  }
+
+  const [inquiries, setInquiries] = useState<Inquiry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState("")
+
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResult, setSearchResult] = useState<Inquiry | null>(null)
   const [searchError, setSearchError] = useState("")
   const [hasSearched, setHasSearched] = useState(false)
   const [expandedInquiry, setExpandedInquiry] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>("all")
+
+  useEffect(() => {
+    if (status !== "authenticated") return
+
+    const fetchInquiries = async () => {
+      try {
+        setLoading(true)
+        setFetchError("")
+
+        const res = await fetch("/api/v1/inquiries", {
+          credentials: "include",
+        })
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            setFetchError("You must be signed in to view your inquiries.")
+          } else {
+            const data = await res.json().catch(() => ({}))
+            setFetchError(data.error || "Failed to fetch inquiries.")
+          }
+          setInquiries([])
+          return
+        }
+
+        const data = await res.json()
+        const raw: unknown[] = data.data || []
+
+        const parsed: Inquiry[] = raw.map((item: any) => ({
+          ...item,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        }))
+
+        setInquiries(parsed)
+      } catch (err) {
+        console.error("Error fetching inquiries:", err)
+        setFetchError("An unexpected error occurred while fetching your inquiries.")
+        setInquiries([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchInquiries()
+  }, [status])
 
   const handleSearch = () => {
     if (!searchQuery.trim()) {
@@ -61,7 +119,7 @@ export default function ViewInquiriesPage() {
     }
 
     setHasSearched(true)
-    const found = mockInquiries.find(
+    const found = inquiries.find(
       (inq) => inq.id.toLowerCase() === searchQuery.trim().toLowerCase()
     )
 
@@ -80,9 +138,10 @@ export default function ViewInquiriesPage() {
     }
   }
 
-  const filteredHistory = statusFilter === "all"
-    ? mockInquiries
-    : mockInquiries.filter((inq) => inq.status === statusFilter)
+  const filteredHistory =
+    statusFilter === "all"
+      ? inquiries
+      : inquiries.filter((inq) => inq.status === statusFilter)
 
   const getInquiryTypeLabel = (type: string) => {
     return inquiryTypes.find((t) => t.value === type)?.label || type
@@ -98,10 +157,14 @@ export default function ViewInquiriesPage() {
     }).format(date)
   }
 
-  const InquiryCard = ({ inquiry, isExpanded, onToggle }: { 
+  const InquiryCard = ({
+    inquiry,
+    isExpanded,
+    onToggle,
+  }: {
     inquiry: Inquiry
     isExpanded: boolean
-    onToggle: () => void 
+    onToggle: () => void
   }) => (
     <Card className={`transition-all ${isExpanded ? "ring-2 ring-primary/20" : ""}`}>
       <Collapsible open={isExpanded} onOpenChange={onToggle}>
@@ -117,7 +180,9 @@ export default function ViewInquiriesPage() {
                     {getStatusLabel(inquiry.status)}
                   </Badge>
                 </div>
-                <CardTitle className="text-lg">{getInquiryTypeLabel(inquiry.type)}</CardTitle>
+                <CardTitle className="text-lg">
+                  {getInquiryTypeLabel(inquiry.type)}
+                </CardTitle>
                 <CardDescription className="flex items-center gap-2">
                   <Calendar className="h-3.5 w-3.5" />
                   {formatDate(inquiry.createdAt)}
@@ -141,14 +206,18 @@ export default function ViewInquiriesPage() {
                   <User className="mt-0.5 h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">Patient Name</p>
-                    <p className="font-medium text-foreground">{inquiry.patientName}</p>
+                    <p className="font-medium text-foreground">
+                      {inquiry.patientName}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <Phone className="mt-0.5 h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">Contact Number</p>
-                    <p className="font-medium text-foreground">{inquiry.contactNumber}</p>
+                    <p className="font-medium text-foreground">
+                      {inquiry.contactNumber}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -171,21 +240,27 @@ export default function ViewInquiriesPage() {
                   <User className="mt-0.5 h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">Relationship</p>
-                    <p className="font-medium text-foreground">{inquiry.relationship}</p>
+                    <p className="font-medium text-foreground">
+                      {inquiry.relationship}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <Clock className="mt-0.5 h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">Last Updated</p>
-                    <p className="font-medium text-foreground">{formatDate(inquiry.updatedAt)}</p>
+                    <p className="font-medium text-foreground">
+                      {formatDate(inquiry.updatedAt)}
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
             <div className="mt-4 rounded-lg bg-muted/50 p-4">
               <p className="mb-1 text-xs font-medium text-muted-foreground">Details</p>
-              <p className="text-sm leading-relaxed text-foreground">{inquiry.details}</p>
+              <p className="text-sm leading-relaxed text-foreground">
+                {inquiry.details}
+              </p>
             </div>
           </CardContent>
         </CollapsibleContent>
@@ -195,14 +270,15 @@ export default function ViewInquiriesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
               <HeartPulse className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-lg font-semibold text-foreground">MediCare Health</span>
+            <span className="text-lg font-semibold text-foreground">
+              MediCare Health
+            </span>
           </Link>
           <Button variant="ghost" asChild>
             <Link href="/support">
@@ -213,10 +289,8 @@ export default function ViewInquiriesPage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="mx-auto max-w-3xl">
-          {/* Page Header */}
           <div className="mb-8 text-center">
             <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground md:text-3xl">
               View Inquiries
@@ -226,133 +300,167 @@ export default function ViewInquiriesPage() {
             </p>
           </div>
 
-          {/* Search Section */}
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="h-5 w-5 text-primary" />
-                Search by Inquiry ID
-              </CardTitle>
-              <CardDescription>
-                Enter your inquiry ID to check its status (e.g., INQ-M5K2X9-AB12)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-3">
-                <Input
-                  placeholder="Enter inquiry ID..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value)
-                    setSearchError("")
-                  }}
-                  onKeyDown={handleKeyDown}
-                  className="flex-1 uppercase"
-                />
-                <Button onClick={handleSearch}>
-                  <Search className="mr-2 h-4 w-4" />
-                  Search
-                </Button>
-              </div>
+          {loading && (
+            <Card className="mb-8">
+              <CardContent className="flex items-center justify-center py-12">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin text-primary" />
+                <p className="text-muted-foreground">Loading your inquiries...</p>
+              </CardContent>
+            </Card>
+          )}
 
-              {/* Search Result */}
-              {hasSearched && (
-                <div className="mt-4">
-                  {searchError ? (
-                    <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-                      <AlertCircle className="h-5 w-5 text-destructive" />
-                      <p className="text-sm text-destructive">{searchError}</p>
+          {!loading && fetchError && (
+            <Card className="mb-8 border-destructive/30">
+              <CardContent className="py-12 text-center">
+                <AlertCircle className="mx-auto mb-4 h-12 w-12 text-destructive/70" />
+                <p className="mb-2 font-medium text-destructive">{fetchError}</p>
+                <Button className="mt-4" asChild>
+                  <Link href="/auth/login">
+                    <LogIn className="mr-2 h-4 w-4" />
+                    Sign In
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {!loading && !fetchError && (
+            <>
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Search className="h-5 w-5 text-primary" />
+                    Search by Inquiry ID
+                  </CardTitle>
+                  <CardDescription>
+                    Enter your inquiry ID to check its status (e.g., INQ-M5K2X9-AB12)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-3">
+                    <Input
+                      placeholder="Enter inquiry ID..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value)
+                        setSearchError("")
+                      }}
+                      onKeyDown={handleKeyDown}
+                      className="flex-1 uppercase"
+                    />
+                    <Button onClick={handleSearch}>
+                      <Search className="mr-2 h-4 w-4" />
+                      Search
+                    </Button>
+                  </div>
+
+                  {hasSearched && (
+                    <div className="mt-4">
+                      {searchError ? (
+                        <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                          <AlertCircle className="h-5 w-5 text-destructive" />
+                          <p className="text-sm text-destructive">{searchError}</p>
+                        </div>
+                      ) : searchResult ? (
+                        <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-1">
+                          <InquiryCard
+                            inquiry={searchResult}
+                            isExpanded={expandedInquiry === searchResult.id}
+                            onToggle={() =>
+                              setExpandedInquiry(
+                                expandedInquiry === searchResult.id
+                                  ? null
+                                  : searchResult.id
+                              )
+                            }
+                          />
+                        </div>
+                      ) : null}
                     </div>
-                  ) : searchResult ? (
-                    <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-1">
+                  )}
+                </CardContent>
+              </Card>
+
+              <div>
+                <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <History className="h-5 w-5 text-muted-foreground" />
+                    <h2 className="text-lg font-semibold text-foreground">
+                      Inquiry History
+                    </h2>
+                    <Badge variant="secondary" className="ml-1">
+                      {filteredHistory.length}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Filter className="h-4 w-4 text-muted-foreground" />
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-36">
+                          <SelectValue placeholder="Filter status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="in-progress">In Progress</SelectItem>
+                          <SelectItem value="resolved">Resolved</SelectItem>
+                          <SelectItem value="closed">Closed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href="/support/request">
+                        <Plus className="mr-1 h-4 w-4" />
+                        New
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+
+                {filteredHistory.length === 0 ? (
+                  <Card className="border-dashed">
+                    <CardContent className="py-12 text-center">
+                      <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
+                      <p className="mb-2 font-medium text-foreground">
+                        No inquiries found
+                      </p>
+                      <p className="mb-4 text-sm text-muted-foreground">
+                        {statusFilter === "all"
+                          ? "You haven't submitted any inquiries yet."
+                          : `No inquiries with status "${getStatusLabel(
+                              statusFilter as Inquiry["status"]
+                            )}".`}
+                      </p>
+                      <Button asChild>
+                        <Link href="/support/request">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Submit New Inquiry
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredHistory.map((inquiry) => (
                       <InquiryCard
-                        inquiry={searchResult}
-                        isExpanded={expandedInquiry === searchResult.id}
+                        key={inquiry.id}
+                        inquiry={inquiry}
+                        isExpanded={expandedInquiry === inquiry.id}
                         onToggle={() =>
                           setExpandedInquiry(
-                            expandedInquiry === searchResult.id ? null : searchResult.id
+                            expandedInquiry === inquiry.id ? null : inquiry.id
                           )
                         }
                       />
-                    </div>
-                  ) : null}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Inquiry History */}
-          <div>
-            <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <History className="h-5 w-5 text-muted-foreground" />
-                <h2 className="text-lg font-semibold text-foreground">Inquiry History</h2>
-                <Badge variant="secondary" className="ml-1">
-                  {filteredHistory.length}
-                </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-36">
-                      <SelectValue placeholder="Filter status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in-progress">In Progress</SelectItem>
-                      <SelectItem value="resolved">Resolved</SelectItem>
-                      <SelectItem value="closed">Closed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/support/request">
-                    <Plus className="mr-1 h-4 w-4" />
-                    New
-                  </Link>
-                </Button>
-              </div>
-            </div>
-
-            {filteredHistory.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="py-12 text-center">
-                  <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
-                  <p className="mb-2 font-medium text-foreground">No inquiries found</p>
-                  <p className="mb-4 text-sm text-muted-foreground">
-                    {statusFilter === "all"
-                      ? "You haven't submitted any inquiries yet."
-                      : `No inquiries with status "${getStatusLabel(statusFilter as Inquiry["status"])}".`}
-                  </p>
-                  <Button asChild>
-                    <Link href="/support/request">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Submit New Inquiry
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {filteredHistory.map((inquiry) => (
-                  <InquiryCard
-                    key={inquiry.id}
-                    inquiry={inquiry}
-                    isExpanded={expandedInquiry === inquiry.id}
-                    onToggle={() =>
-                      setExpandedInquiry(
-                        expandedInquiry === inquiry.id ? null : inquiry.id
-                      )
-                    }
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </main>
     </div>
   )
 }
+

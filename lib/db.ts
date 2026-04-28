@@ -1,12 +1,14 @@
-import { MongoClient } from "mongodb"
+import { MongoClient, MongoClientOptions } from "mongodb"
 
 if (!process.env.MONGODB_URI) {
   throw new Error("MONGODB_URI is not defined")
 }
 
 const uri = process.env.MONGODB_URI
-const options = {
+const options: MongoClientOptions = {
   maxPoolSize: 10,
+  serverSelectionTimeoutMS: 10000,
+  connectTimeoutMS: 10000,
 }
 
 let client: MongoClient

@@ -14,15 +14,10 @@ export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
 
-  // Redirect Standard users to landing page
   useEffect(() => {
     if (session?.user) {
-      // Check MongoDB for user role - for now we'll fetch it
       const checkUserRole = async () => {
         try {
-          // You can add an API endpoint to get user role, or derive from session
-          // For now, we assume role is passed through session if available
-          // If user is standard, redirect to home
           if ((session.user as any)?.role === "standard") {
             router.push("/")
           }
@@ -85,7 +80,6 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-foreground mb-2">
             Welcome back, {session?.user?.name}!
@@ -95,9 +89,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Dashboard Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* User Profile Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -120,7 +112,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Appointments Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -139,7 +130,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Medical Records Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -159,7 +149,6 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Quick Stats */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Account Status</CardTitle>

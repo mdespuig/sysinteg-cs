@@ -7,7 +7,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { inquiryType, patientName, contactNumber, email, address, relationship, details } = body
 
-    // Validation
     if (!inquiryType || !patientName || !contactNumber || !email || !address || !relationship || !details) {
       return NextResponse.json(
         { error: "All fields are required" },
@@ -15,7 +14,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return NextResponse.json(
@@ -28,10 +26,8 @@ export async function POST(request: NextRequest) {
     const db = client.db("healthcare")
     const inquiriesCollection = db.collection("inquiries")
 
-    // Generate unique inquiry ID
     const inquiryId = generateInquiryId()
 
-    // Create inquiry document
     const inquiry = {
       id: inquiryId,
       type: inquiryType as InquiryType,
@@ -46,7 +42,6 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     }
 
-    // Insert into database
     await inquiriesCollection.insertOne(inquiry)
 
     return NextResponse.json(

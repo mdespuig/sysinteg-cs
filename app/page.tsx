@@ -23,10 +23,8 @@ import { Header } from "@/components/header"
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <Header />
 
-      {/* Hero Section */}
       <section className="relative overflow-hidden border-b">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
         <div className="container relative mx-auto px-4 py-20 md:py-28">
@@ -59,7 +57,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Stats Section */}
       <section className="border-b bg-card">
         <div className="container mx-auto px-4 py-12">
           <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
@@ -83,7 +80,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Services Section */}
       <section id="services" className="scroll-mt-16 border-b">
         <div className="container mx-auto px-4 py-16 md:py-20">
           <div className="mb-12 text-center">
@@ -169,7 +165,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* About Section */}
       <section id="about" className="scroll-mt-16 border-b bg-muted/30">
         <div className="container mx-auto px-4 py-16 md:py-20">
           <div className="grid items-center gap-12 lg:grid-cols-2">
@@ -230,7 +225,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Contact Section */}
       <section id="contact" className="scroll-mt-16 border-b">
         <div className="container mx-auto px-4 py-16 md:py-20">
           <div className="mb-12 text-center">
@@ -277,7 +271,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-card">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">

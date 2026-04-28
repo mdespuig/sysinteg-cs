@@ -100,6 +100,8 @@ export default function RequestInquiryPage() {
     setErrors({})
     
     try {
+      console.log("[v0] Submitting inquiry with data:", formData)
+      
       const response = await fetch("/api/v1/inquiries", {
         method: "POST",
         headers: {
@@ -108,22 +110,28 @@ export default function RequestInquiryPage() {
         body: JSON.stringify(formData),
       })
 
+      console.log("[v0] Response status:", response.status)
+      
       const data = await response.json()
+      console.log("[v0] Response data:", data)
 
       if (!response.ok) {
+        console.error("[v0] Server error:", data.error)
         setErrors({ details: data.error || "Failed to submit inquiry" })
         setIsSubmitting(false)
         return
       }
 
       if (data.inquiryId) {
+        console.log("[v0] Inquiry submitted successfully with ID:", data.inquiryId)
         setGeneratedId(data.inquiryId)
         setIsSubmitted(true)
       } else {
+        console.error("[v0] No inquiry ID in response")
         setErrors({ details: "No inquiry ID returned from server" })
       }
     } catch (error) {
-      console.error("Error submitting inquiry:", error)
+      console.error("[v0] Error submitting inquiry:", error)
       setErrors({ details: error instanceof Error ? error.message : "Failed to submit inquiry. Please try again." })
     } finally {
       setIsSubmitting(false)
@@ -148,7 +156,6 @@ export default function RequestInquiryPage() {
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-background">
-        {/* Header */}
         <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <div className="container mx-auto flex h-16 items-center justify-between px-4">
             <Link href="/" className="flex items-center gap-2">
@@ -212,7 +219,6 @@ export default function RequestInquiryPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2">
@@ -230,10 +236,8 @@ export default function RequestInquiryPage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="mx-auto max-w-2xl">
-          {/* Page Header */}
           <div className="mb-8 text-center">
             <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground md:text-3xl">
               Submit an Inquiry
@@ -243,7 +247,6 @@ export default function RequestInquiryPage() {
             </p>
           </div>
 
-          {/* Form */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -256,7 +259,6 @@ export default function RequestInquiryPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Inquiry Type */}
                 <div className="space-y-2">
                   <Label htmlFor="inquiry-type" className="flex items-center gap-1">
                     <FileText className="h-4 w-4 text-muted-foreground" />
@@ -287,7 +289,6 @@ export default function RequestInquiryPage() {
                   )}
                 </div>
 
-                {/* Patient Name */}
                 <div className="space-y-2">
                   <Label htmlFor="patient-name" className="flex items-center gap-1">
                     <User className="h-4 w-4 text-muted-foreground" />
@@ -305,7 +306,6 @@ export default function RequestInquiryPage() {
                   )}
                 </div>
 
-                {/* Contact Number & Email */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="contact-number" className="flex items-center gap-1">
@@ -344,7 +344,6 @@ export default function RequestInquiryPage() {
                   </div>
                 </div>
 
-                {/* Address */}
                 <div className="space-y-2">
                   <Label htmlFor="address" className="flex items-center gap-1">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -362,7 +361,6 @@ export default function RequestInquiryPage() {
                   )}
                 </div>
 
-                {/* Relationship to Patient */}
                 <div className="space-y-2">
                   <Label htmlFor="relationship" className="flex items-center gap-1">
                     <Users className="h-4 w-4 text-muted-foreground" />
@@ -388,7 +386,6 @@ export default function RequestInquiryPage() {
                   )}
                 </div>
 
-                {/* Details */}
                 <div className="space-y-2">
                   <Label htmlFor="details" className="flex items-center gap-1">
                     <FileText className="h-4 w-4 text-muted-foreground" />
@@ -407,7 +404,6 @@ export default function RequestInquiryPage() {
                   )}
                 </div>
 
-                {/* Submit Button */}
                 <div className="flex gap-4 pt-4">
                   <Button type="button" variant="outline" className="flex-1" asChild>
                     <Link href="/support">Cancel</Link>

@@ -6,14 +6,12 @@ export async function POST(request: NextRequest) {
   try {
     let { username, email, password, confirmPassword, role } = await request.json()
 
-    // Normalize username to lowercase and validate allowed characters
     if (typeof username === "string") {
       username = username.trim().toLowerCase()
     }
 
     const usernameRegex = /^[a-z0-9_]+$/
 
-    // Validation
     if (!username || !email || !password || !confirmPassword || !role) {
       return NextResponse.json(
         { error: "All fields are required" },
@@ -46,7 +44,6 @@ export async function POST(request: NextRequest) {
     const db = client.db("healthcare")
     const usersCollection = db.collection("users")
 
-    // Check if user already exists
     const existingUser = await usersCollection.findOne({
       $or: [{ username }, { email }],
     })
@@ -58,10 +55,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Create user
     const result = await usersCollection.insertOne({
       username,
       email,

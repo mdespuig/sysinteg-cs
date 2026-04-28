@@ -83,7 +83,6 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="mb-8 flex flex-col items-center text-center">
           <Link href="/" className="mb-6 flex items-center gap-2">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
@@ -94,7 +93,6 @@ export default function SignupPage() {
           <p className="text-muted-foreground">Sign up to access healthcare services</p>
         </div>
 
-        {/* Signup Card */}
         <Card className="border shadow-lg">
           <CardHeader>
             <CardTitle>Register</CardTitle>
@@ -104,7 +102,6 @@ export default function SignupPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignup} className="space-y-5">
-              {/* Username */}
               <div className="space-y-2">
                 <Label htmlFor="username" className="text-sm font-medium">
                   Username
@@ -122,7 +119,6 @@ export default function SignupPage() {
                 />
               </div>
 
-              {/* Email */}
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">
                   Email
@@ -140,7 +136,6 @@ export default function SignupPage() {
                 />
               </div>
 
-              {/* Password */}
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-medium">
                   Password
@@ -158,7 +153,6 @@ export default function SignupPage() {
                 />
               </div>
 
-              {/* Confirm Password */}
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword" className="text-sm font-medium">
                   Confirm Password
@@ -176,7 +170,6 @@ export default function SignupPage() {
                 />
               </div>
 
-              {/* Role Selection */}
               <div className="space-y-2">
                 <Label htmlFor="role" className="text-sm font-medium">
                   Role
@@ -193,7 +186,6 @@ export default function SignupPage() {
                 </Select>
               </div>
 
-              {/* Submit Button */}
               <Button
                 type="submit"
                 className="w-full h-10 bg-primary hover:bg-primary/90 mt-6"
@@ -210,7 +202,6 @@ export default function SignupPage() {
               </Button>
             </form>
 
-            {/* Login Link */}
             <div className="mt-6 text-center text-sm">
               <p className="text-muted-foreground">
                 Already have an account?{" "}
@@ -222,7 +213,6 @@ export default function SignupPage() {
           </CardContent>
         </Card>
 
-        {/* Footer Links */}
         <div className="mt-6 flex justify-center gap-4 text-xs text-muted-foreground">
           <Link href="/" className="hover:text-foreground transition-colors">
             Back to Home

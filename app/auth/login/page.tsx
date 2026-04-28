@@ -45,7 +45,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="mb-8 flex flex-col items-center text-center">
           <Link href="/" className="mb-6 flex items-center gap-2">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
@@ -56,7 +55,6 @@ export default function LoginPage() {
           <p className="text-muted-foreground">Sign in to access your healthcare account</p>
         </div>
 
-        {/* Login Card */}
         <Card className="border shadow-lg">
           <CardHeader>
             <CardTitle>Login</CardTitle>
@@ -66,7 +64,6 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-6">
-              {/* Username */}
               <div className="space-y-2">
                 <Label htmlFor="username" className="text-sm font-medium">
                   Username
@@ -83,7 +80,6 @@ export default function LoginPage() {
                 />
               </div>
 
-              {/* Password */}
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-medium">
                   Password
@@ -100,7 +96,6 @@ export default function LoginPage() {
                 />
               </div>
 
-              {/* Submit Button */}
               <Button
                 type="submit"
                 className="w-full h-10 bg-primary hover:bg-primary/90"
@@ -117,7 +112,6 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            {/* Sign Up Link */}
             <div className="mt-6 text-center text-sm">
               <p className="text-muted-foreground">
                 Don't have an account?{" "}
@@ -129,7 +123,6 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        {/* Footer Links */}
         <div className="mt-6 flex justify-center gap-4 text-xs text-muted-foreground">
           <Link href="/" className="hover:text-foreground transition-colors">
             Back to Home

@@ -38,14 +38,12 @@ export default function SupportPage() {
     return null
   }
 
-  // If no session or not standard, the effect will redirect; render nothing here
   if (!session || (session?.user as any)?.role !== "standard") {
     return null
   }
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2">
@@ -63,10 +61,8 @@ export default function SupportPage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-12 md:py-16">
         <div className="mx-auto max-w-3xl">
-          {/* Page Header */}
           <div className="mb-10 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
               <Headphones className="h-8 w-8 text-primary" />
@@ -79,9 +75,7 @@ export default function SupportPage() {
             </p>
           </div>
 
-          {/* Support Options */}
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Request Inquiry Card */}
             <Card className="group relative overflow-hidden transition-all hover:border-primary hover:shadow-lg">
               <div className="absolute right-0 top-0 h-24 w-24 translate-x-6 -translate-y-6 rounded-full bg-primary/10 transition-transform group-hover:scale-150" />
               <CardHeader className="relative">
@@ -121,7 +115,6 @@ export default function SupportPage() {
               </CardContent>
             </Card>
 
-            {/* View Inquiry Card */}
             <Card className="group relative overflow-hidden transition-all hover:border-accent hover:shadow-lg">
               <div className="absolute right-0 top-0 h-24 w-24 translate-x-6 -translate-y-6 rounded-full bg-accent/10 transition-transform group-hover:scale-150" />
               <CardHeader className="relative">
@@ -162,7 +155,6 @@ export default function SupportPage() {
             </Card>
           </div>
 
-          {/* Help Note */}
           <Card className="mt-8 border-dashed">
             <CardContent className="flex items-start gap-4 py-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
