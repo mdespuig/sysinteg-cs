@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import {
-  HeartPulse,
   ArrowLeft,
   Search,
   FileText,
@@ -40,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Header } from "@/components/header"
 import {
   inquiryTypes,
   getStatusColor,
@@ -270,27 +270,19 @@ export default function ViewInquiriesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <HeartPulse className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="text-lg font-semibold text-foreground">
-              MediCare Health
-            </span>
-          </Link>
-          <Button variant="ghost" asChild>
-            <Link href="/support">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Support
-            </Link>
-          </Button>
-        </div>
-      </header>
+      <Header />
 
       <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="mx-auto max-w-3xl">
+          <div className="mb-6 flex justify-start">
+            <Button variant="ghost" asChild className="px-0">
+              <Link href="/support">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Support
+              </Link>
+            </Button>
+          </div>
+
           <div className="mb-8 text-center">
             <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground md:text-3xl">
               View Inquiries
@@ -333,7 +325,7 @@ export default function ViewInquiriesPage() {
                     Search by Inquiry ID
                   </CardTitle>
                   <CardDescription>
-                    Enter your inquiry ID to check its status (e.g., INQ-M5K2X9-AB12)
+                    Enter your inquiry ID to check its status (e.g., INQ-AB12)
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -463,4 +455,3 @@ export default function ViewInquiriesPage() {
     </div>
   )
 }
-

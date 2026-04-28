@@ -48,7 +48,7 @@ export default function LandingPage() {
               </Button>
               <Button size="lg" variant="outline" asChild>
                 <Link href="#services">
-                  Learn More
+                  Main Portal
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -214,7 +214,7 @@ export default function LandingPage() {
                     medical records, and more.
                   </p>
                   <Button className="w-full" size="lg" asChild>
-                    <Link href="#contact">
+                    <Link href="/support">
                       Contact Us
                     </Link>
                   </Button>

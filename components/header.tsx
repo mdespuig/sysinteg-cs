@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { useSession, signOut } from "next-auth/react"
-import { useRouter } from "next/navigation"
 import { HeartPulse, LogOut, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,15 +13,22 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
 
-export function Header() {
+type HeaderProps = {
+  showRecordsNav?: boolean
+}
+
+export function Header({ showRecordsNav = false }: HeaderProps) {
   const { data: session } = useSession()
-  const router = useRouter()
+  const isAdmin = (session?.user as any)?.role === "admin"
 
   const handleLogout = async () => {
-    await signOut({ redirect: false })
-    toast.success("Logged out successfully")
-    router.push("/")
-    router.refresh()
+    try {
+      await signOut({ callbackUrl: "/auth/login", redirect: true })
+      toast.success("Logged out successfully")
+    } catch (error) {
+      console.error("Logout failed:", error)
+      toast.error("Failed to log out. Please try again.")
+    }
   }
 
   // Get avatar letter from username
@@ -30,36 +36,37 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2">
+      <div className="container mx-auto grid h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-4">
+        <Link href="/" className="flex items-center gap-2 justify-self-start">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
             <HeartPulse className="h-5 w-5 text-primary-foreground" />
           </div>
           <span className="text-lg font-semibold text-foreground">MediCare Health</span>
         </Link>
 
-        <nav className="hidden items-center gap-6 md:flex">
-          <Link
-            href="#services"
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Services
-          </Link>
-          <Link
-            href="#about"
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            About Us
-          </Link>
-          <Link
-            href="#contact"
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Contact
-          </Link>
+        <nav className="hidden items-center justify-center gap-8 lg:gap-10 md:flex justify-self-center">
+          {isAdmin ? (
+            showRecordsNav ? (
+              <Link href="/dashboard/records" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                Medical Records
+              </Link>
+            ) : null
+          ) : (
+            <>
+              <Link href="/support" className="whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                Contact Support
+              </Link>
+              <Link href="/#about" className="whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                About Us
+              </Link>
+              <Link href="/#services" className="whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                Other Systems
+              </Link>
+            </>
+          )}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-self-end gap-2">
           {session?.user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
