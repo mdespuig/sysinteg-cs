@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import {
   ArrowLeft,
   Send,
@@ -19,7 +19,8 @@ import {
   ArrowRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -32,6 +33,24 @@ import {
 } from "@/components/ui/select"
 import { Header } from "@/components/header"
 import { inquiryTypes, relationshipOptions, type InquiryType } from "@/lib/inquiry-data"
+import { toast } from "sonner"
+
+const PHONE_PREFIX = "+639"
+const PHONE_DIGIT_LIMIT = 9
+
+const extractPhoneDigits = (value: string) => {
+  const digits = value.replace(/\D/g, "")
+
+  if (digits.startsWith("639") && digits.length >= 12) {
+    return digits.slice(3, 12)
+  }
+
+  if (digits.startsWith("09") && digits.length >= 11) {
+    return digits.slice(2, 11)
+  }
+
+  return digits.slice(0, PHONE_DIGIT_LIMIT)
+}
 
 interface FormData {
   inquiryType: InquiryType | ""
@@ -44,11 +63,15 @@ interface FormData {
 }
 
 export default function RequestInquiryPage() {
-  const router = useRouter()
+  const { data: session, status } = useSession()
+  const isMountedRef = useRef(true)
+  const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [generatedId, setGeneratedId] = useState("")
   const [copied, setCopied] = useState(false)
+  const [fillInformationFields, setFillInformationFields] = useState(false)
+  const [isLoadingProfileInfo, setIsLoadingProfileInfo] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     inquiryType: "",
     patientName: "",
@@ -59,6 +82,117 @@ export default function RequestInquiryPage() {
     details: "",
   })
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
+
+  const handleContactNumberChange = (rawValue: string) => {
+    if (rawValue && !/^\d+$/.test(rawValue)) {
+      toast.error("Contact number can only contain numerical characters")
+      return
+    }
+
+    if (rawValue.length > PHONE_DIGIT_LIMIT) {
+      toast.error("Contact number can only contain 9 digits after +639")
+      return
+    }
+
+    updateField("contactNumber", rawValue)
+  }
+
+  const handleContactNumberBlur = () => {
+    if (!formData.contactNumber) return
+
+    if (formData.contactNumber.length !== PHONE_DIGIT_LIMIT) {
+      const message = "Contact number must contain exactly 9 digits after +639"
+      setErrors((prev) => ({ ...prev, contactNumber: message }))
+      toast.error(message)
+      return
+    }
+
+    if (errors.contactNumber) {
+      setErrors((prev) => ({ ...prev, contactNumber: undefined }))
+    }
+  }
+
+  const clearAutoFilledFields = () => {
+    setFormData((prev) => ({
+      ...prev,
+      contactNumber: "",
+      email: "",
+      address: "",
+    }))
+    setErrors((prev) => ({
+      ...prev,
+      contactNumber: undefined,
+      email: undefined,
+      address: undefined,
+    }))
+  }
+
+  const handleFillInformationFieldsChange = async (checked: boolean | "indeterminate") => {
+    if (checked !== true) {
+      setFillInformationFields(false)
+      clearAutoFilledFields()
+      return
+    }
+
+    if (status !== "authenticated" || !session?.user?.id) {
+      toast.error("Sign in to fill information fields")
+      return
+    }
+
+    setFillInformationFields(true)
+    setIsLoadingProfileInfo(true)
+
+    try {
+      const response = await fetch(`/api/v1/profile?userId=${session.user.id}`)
+      const data = await response.json().catch(() => ({}))
+
+      if (!isMountedRef.current) return
+
+      const contactNumber =
+        typeof data?.data?.personalData?.contactNumber === "string"
+          ? data.data.personalData.contactNumber.trim()
+          : ""
+      const email =
+        typeof data?.data?.email === "string"
+          ? data.data.email.trim()
+          : ""
+      const address =
+        typeof data?.data?.personalData?.address === "string"
+          ? data.data.personalData.address.trim()
+          : ""
+
+      if (!response.ok || !contactNumber || !email || !address) {
+        toast.error("Complete your profile contact information first")
+        setFillInformationFields(false)
+        clearAutoFilledFields()
+        return
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        contactNumber: extractPhoneDigits(contactNumber),
+        email,
+        address,
+      }))
+      setErrors((prev) => ({
+        ...prev,
+        contactNumber: undefined,
+        email: undefined,
+        address: undefined,
+      }))
+      setFillInformationFields(true)
+    } catch (error) {
+      if (!isMountedRef.current) return
+      console.error("Failed to load profile information:", error)
+      toast.error("Failed to load profile information")
+      setFillInformationFields(false)
+      clearAutoFilledFields()
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoadingProfileInfo(false)
+      }
+    }
+  }
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof FormData, string>> = {}
@@ -71,6 +205,8 @@ export default function RequestInquiryPage() {
     }
     if (!formData.contactNumber.trim()) {
       newErrors.contactNumber = "Contact number is required"
+    } else if (!/^\d{9}$/.test(formData.contactNumber)) {
+      newErrors.contactNumber = "Contact number must contain exactly 9 digits after +639"
     }
     if (!formData.email.trim()) {
       newErrors.email = "Email is required"
@@ -100,8 +236,6 @@ export default function RequestInquiryPage() {
     setErrors({})
     
     try {
-      console.log("[v0] Submitting inquiry with data:", formData)
-      
       const response = await fetch("/api/v1/inquiries", {
         method: "POST",
         headers: {
@@ -109,40 +243,52 @@ export default function RequestInquiryPage() {
         },
         body: JSON.stringify(formData),
       })
-
-      console.log("[v0] Response status:", response.status)
       
       const data = await response.json()
-      console.log("[v0] Response data:", data)
+
+      if (!isMountedRef.current) return
 
       if (!response.ok) {
-        console.error("[v0] Server error:", data.error)
         setErrors({ details: data.error || "Failed to submit inquiry" })
-        setIsSubmitting(false)
         return
       }
 
       if (data.inquiryId) {
-        console.log("[v0] Inquiry submitted successfully with ID:", data.inquiryId)
         setGeneratedId(data.inquiryId)
         setIsSubmitted(true)
       } else {
-        console.error("[v0] No inquiry ID in response")
         setErrors({ details: "No inquiry ID returned from server" })
       }
     } catch (error) {
-      console.error("[v0] Error submitting inquiry:", error)
+      if (!isMountedRef.current) return
+      console.error("Error submitting inquiry:", error)
       setErrors({ details: error instanceof Error ? error.message : "Failed to submit inquiry. Please try again." })
     } finally {
-      setIsSubmitting(false)
+      if (isMountedRef.current) {
+        setIsSubmitting(false)
+      }
     }
   }
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(generatedId)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+
+    if (copyResetTimeoutRef.current) {
+      clearTimeout(copyResetTimeoutRef.current)
+    }
+
+    copyResetTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
   }
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const updateField = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -173,7 +319,7 @@ export default function RequestInquiryPage() {
                 <p className="mb-2 text-sm text-muted-foreground">Your Inquiry ID</p>
                 <div className="flex items-center justify-center gap-2">
                   <code className="text-xl font-bold tracking-wider text-primary">{generatedId}</code>
-                  <Button variant="ghost" size="sm" onClick={handleCopyId}>
+                  <Button variant="ghost" size="sm" className="cursor-pointer" onClick={handleCopyId}>
                     {copied ? (
                       <CheckCircle className="h-4 w-4 text-online" />
                     ) : (
@@ -238,16 +384,13 @@ export default function RequestInquiryPage() {
                 <Clipboard className="h-5 w-5 text-primary" />
                 Inquiry Form
               </CardTitle>
-              <CardDescription>
-                All fields marked with * are required.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="inquiry-type" className="flex items-center gap-1">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    Type of Inquiry *
+                    Type of Inquiry
                   </Label>
                   <Select
                     value={formData.inquiryType}
@@ -277,7 +420,7 @@ export default function RequestInquiryPage() {
                 <div className="space-y-2">
                   <Label htmlFor="patient-name" className="flex items-center gap-1">
                     <User className="h-4 w-4 text-muted-foreground" />
-                    Name of Patient *
+                    Name of Patient
                   </Label>
                   <Input
                     id="patient-name"
@@ -291,20 +434,59 @@ export default function RequestInquiryPage() {
                   )}
                 </div>
 
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="fill-information-fields"
+                      checked={fillInformationFields}
+                      onCheckedChange={handleFillInformationFieldsChange}
+                      disabled={isLoadingProfileInfo || status === "loading"}
+                      className="mt-1 cursor-pointer"
+                    />
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label
+                          htmlFor="fill-information-fields"
+                          className="cursor-pointer font-medium"
+                        >
+                          Fill information fields
+                        </Label>
+                        {isLoadingProfileInfo && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Automatically use your saved contact number, email address, and address from your profile.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="contact-number" className="flex items-center gap-1">
                       <Phone className="h-4 w-4 text-muted-foreground" />
-                      Contact Number *
+                      Contact Number
                     </Label>
-                    <Input
-                      id="contact-number"
-                      type="tel"
-                      placeholder="+63 9XX XXX XXXX"
-                      value={formData.contactNumber}
-                      onChange={(e) => updateField("contactNumber", e.target.value)}
-                      className={errors.contactNumber ? "border-destructive" : ""}
-                    />
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-[#006AEE]">
+                        {PHONE_PREFIX}
+                      </span>
+                      <Input
+                        id="contact-number"
+                        type="tel"
+                        inputMode="numeric"
+                        placeholder="912345678"
+                        value={formData.contactNumber}
+                        onChange={(e) => handleContactNumberChange(e.target.value)}
+                        onBlur={handleContactNumberBlur}
+                        minLength={PHONE_DIGIT_LIMIT}
+                        maxLength={PHONE_DIGIT_LIMIT}
+                        pattern="[0-9]{9}"
+                        disabled={fillInformationFields || isLoadingProfileInfo}
+                        className={`pl-20 ${errors.contactNumber ? "border-destructive" : ""}`}
+                      />
+                    </div>
                     {errors.contactNumber && (
                       <p className="text-sm text-destructive">{errors.contactNumber}</p>
                     )}
@@ -313,7 +495,7 @@ export default function RequestInquiryPage() {
                   <div className="space-y-2">
                     <Label htmlFor="email" className="flex items-center gap-1">
                       <Mail className="h-4 w-4 text-muted-foreground" />
-                      Email Address *
+                      Email Address
                     </Label>
                     <Input
                       id="email"
@@ -321,6 +503,7 @@ export default function RequestInquiryPage() {
                       placeholder="example@email.com"
                       value={formData.email}
                       onChange={(e) => updateField("email", e.target.value)}
+                      disabled={fillInformationFields || isLoadingProfileInfo}
                       className={errors.email ? "border-destructive" : ""}
                     />
                     {errors.email && (
@@ -332,13 +515,14 @@ export default function RequestInquiryPage() {
                 <div className="space-y-2">
                   <Label htmlFor="address" className="flex items-center gap-1">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
-                    Address *
+                    Address
                   </Label>
                   <Input
                     id="address"
                     placeholder="Enter complete address"
                     value={formData.address}
                     onChange={(e) => updateField("address", e.target.value)}
+                    disabled={fillInformationFields || isLoadingProfileInfo}
                     className={errors.address ? "border-destructive" : ""}
                   />
                   {errors.address && (
@@ -349,7 +533,7 @@ export default function RequestInquiryPage() {
                 <div className="space-y-2">
                   <Label htmlFor="relationship" className="flex items-center gap-1">
                     <Users className="h-4 w-4 text-muted-foreground" />
-                    Relationship to Patient *
+                    Relationship to Patient
                   </Label>
                   <Select
                     value={formData.relationship}
@@ -374,7 +558,7 @@ export default function RequestInquiryPage() {
                 <div className="space-y-2">
                   <Label htmlFor="details" className="flex items-center gap-1">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    Details *
+                    Details
                   </Label>
                   <Textarea
                     id="details"
@@ -393,7 +577,7 @@ export default function RequestInquiryPage() {
                   <Button type="button" variant="outline" className="flex-1" asChild>
                     <Link href="/support">Cancel</Link>
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                  <Button type="submit" className="flex-1 cursor-pointer" disabled={isSubmitting}>
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

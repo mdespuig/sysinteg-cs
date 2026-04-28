@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { HeartPulse, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,8 @@ import { toast } from "sonner"
 
 export default function SignupPage() {
   const router = useRouter()
+  const isMountedRef = useRef(true)
+  const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     username: "",
@@ -63,6 +65,7 @@ export default function SignupPage() {
       })
 
       const data = await response.json()
+      if (!isMountedRef.current) return
 
       if (!response.ok) {
         toast.error(data.error || "Registration failed")
@@ -70,15 +73,32 @@ export default function SignupPage() {
       }
 
       toast.success("Registration successful! Redirecting to login...")
-      setTimeout(() => {
+
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current)
+      }
+
+      redirectTimeoutRef.current = setTimeout(() => {
         router.push("/auth/login")
       }, 1500)
     } catch (error) {
+      if (!isMountedRef.current) return
       toast.error("An error occurred during registration")
     } finally {
-      setIsLoading(false)
+      if (isMountedRef.current) {
+        setIsLoading(false)
+      }
     }
   }
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
@@ -175,7 +195,7 @@ export default function SignupPage() {
                   Role
                 </Label>
                 <Select value={formData.role} onValueChange={handleRoleChange}>
-                  <SelectTrigger className="h-10" disabled={isLoading}>
+                  <SelectTrigger className="h-10 w-full" disabled={isLoading}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -188,7 +208,7 @@ export default function SignupPage() {
 
               <Button
                 type="submit"
-                className="w-full h-10 bg-primary hover:bg-primary/90 mt-6"
+                className="w-full h-10 cursor-pointer bg-primary hover:bg-primary/90 mt-6"
                 disabled={isLoading}
               >
                 {isLoading ? (

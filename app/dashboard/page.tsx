@@ -31,28 +31,26 @@ export default function DashboardPage() {
   })
 
   useEffect(() => {
-    if (session?.user) {
-      const checkUserRole = async () => {
-        try {
-          if ((session.user as any)?.role === "standard") {
-            router.push("/")
-          }
-        } catch (error) {
-          console.error("Error checking user role:", error)
-        }
-      }
-
-      checkUserRole()
+    if (status !== "authenticated") return
+    if ((session?.user as any)?.role === "standard") {
+      router.replace("/")
     }
-  }, [session, router])
+  }, [status, session?.user, router])
 
   useEffect(() => {
     if (!isAdmin) return
 
+    let isActive = true
+    let controller: AbortController | null = null
+
     const loadCounts = async () => {
+      controller?.abort()
+      controller = new AbortController()
+
       try {
         const res = await fetch("/api/v1/inquiries/admin", {
           credentials: "include",
+          signal: controller.signal,
         })
         const data = await res.json()
 
@@ -73,16 +71,25 @@ export default function DashboardPage() {
           { total: 0, pending: 0, "in-progress": 0, resolved: 0, closed: 0 }
         )
 
-        setCounts(nextCounts)
+        if (isActive) {
+          setCounts(nextCounts)
+        }
       } catch (error) {
+        if ((error as Error).name === "AbortError") return
         console.error("Failed to load inquiry counts:", error)
-        toast.error("Failed to load inquiry counts")
+        if (isActive) {
+          toast.error("Failed to load inquiry counts")
+        }
       }
     }
 
-    loadCounts()
+    void loadCounts()
     const interval = setInterval(loadCounts, 10000)
-    return () => clearInterval(interval)
+    return () => {
+      isActive = false
+      controller?.abort()
+      clearInterval(interval)
+    }
   }, [isAdmin])
 
   if (status === "loading") {
@@ -112,25 +119,29 @@ export default function DashboardPage() {
         </div>
 
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
-          <Card>
+          <Card className="flex h-full flex-col">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
                 Profile Information
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Username</p>
-                <p className="font-medium">{session?.user?.name}</p>
+            <CardContent className="flex flex-1 flex-col gap-4">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Username</p>
+                  <p className="font-medium">{session?.user?.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Email</p>
+                  <p className="font-medium">{session?.user?.email}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Email</p>
-                <p className="font-medium">{session?.user?.email}</p>
+              <div className="mt-auto pt-4">
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href="/profile">Edit Profile</Link>
+                </Button>
               </div>
-              <Button variant="outline" className="w-full">
-                Edit Profile
-              </Button>
             </CardContent>
           </Card>
 
