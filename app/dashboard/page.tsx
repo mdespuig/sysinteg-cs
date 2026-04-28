@@ -31,28 +31,26 @@ export default function DashboardPage() {
   })
 
   useEffect(() => {
-    if (session?.user) {
-      const checkUserRole = async () => {
-        try {
-          if ((session.user as any)?.role === "standard") {
-            router.push("/")
-          }
-        } catch (error) {
-          console.error("Error checking user role:", error)
-        }
-      }
-
-      checkUserRole()
+    if (status !== "authenticated") return
+    if ((session?.user as any)?.role === "standard") {
+      router.replace("/")
     }
-  }, [session, router])
+  }, [status, session?.user, router])
 
   useEffect(() => {
     if (!isAdmin) return
 
+    let isActive = true
+    let controller: AbortController | null = null
+
     const loadCounts = async () => {
+      controller?.abort()
+      controller = new AbortController()
+
       try {
         const res = await fetch("/api/v1/inquiries/admin", {
           credentials: "include",
+          signal: controller.signal,
         })
         const data = await res.json()
 
@@ -73,16 +71,25 @@ export default function DashboardPage() {
           { total: 0, pending: 0, "in-progress": 0, resolved: 0, closed: 0 }
         )
 
-        setCounts(nextCounts)
+        if (isActive) {
+          setCounts(nextCounts)
+        }
       } catch (error) {
+        if ((error as Error).name === "AbortError") return
         console.error("Failed to load inquiry counts:", error)
-        toast.error("Failed to load inquiry counts")
+        if (isActive) {
+          toast.error("Failed to load inquiry counts")
+        }
       }
     }
 
-    loadCounts()
+    void loadCounts()
     const interval = setInterval(loadCounts, 10000)
-    return () => clearInterval(interval)
+    return () => {
+      isActive = false
+      controller?.abort()
+      clearInterval(interval)
+    }
   }, [isAdmin])
 
   if (status === "loading") {

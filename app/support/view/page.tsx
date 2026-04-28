@@ -68,14 +68,21 @@ export default function ViewInquiriesPage() {
   useEffect(() => {
     if (status !== "authenticated") return
 
+    let isActive = true
+    const controller = new AbortController()
+
     const fetchInquiries = async () => {
       try {
+        if (!isActive) return
         setLoading(true)
         setFetchError("")
 
         const res = await fetch("/api/v1/inquiries", {
           credentials: "include",
+          signal: controller.signal,
         })
+
+        if (!isActive) return
 
         if (!res.ok) {
           if (res.status === 401) {
@@ -99,15 +106,25 @@ export default function ViewInquiriesPage() {
 
         setInquiries(parsed)
       } catch (err) {
+        if ((err as Error).name === "AbortError") return
         console.error("Error fetching inquiries:", err)
-        setFetchError("An unexpected error occurred while fetching your inquiries.")
-        setInquiries([])
+        if (isActive) {
+          setFetchError("An unexpected error occurred while fetching your inquiries.")
+          setInquiries([])
+        }
       } finally {
-        setLoading(false)
+        if (isActive) {
+          setLoading(false)
+        }
       }
     }
 
-    fetchInquiries()
+    void fetchInquiries()
+
+    return () => {
+      isActive = false
+      controller.abort()
+    }
   }, [status])
 
   const handleSearch = () => {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import {
@@ -46,7 +46,6 @@ export default function RecordsPage() {
   const router = useRouter()
   const [items, setItems] = useState<SortableInquiry[]>([])
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState("")
   const [pageSize, setPageSize] = useState("5")
   const [typeFilter, setTypeFilter] = useState("all")
@@ -56,8 +55,17 @@ export default function RecordsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
+  const isMountedRef = useRef(true)
+  const inquiriesControllerRef = useRef<AbortController | null>(null)
 
   const isAdmin = (session?.user as any)?.role === "admin"
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+      inquiriesControllerRef.current?.abort()
+    }
+  }, [])
 
   useEffect(() => {
     if (status === "loading") return
@@ -85,29 +93,41 @@ export default function RecordsPage() {
 
   const loadData = useCallback(async (showLoader = false) => {
     try {
+      inquiriesControllerRef.current?.abort()
+      const controller = new AbortController()
+      inquiriesControllerRef.current = controller
+
       if (showLoader) {
-        setLoading(true)
-      } else {
-        setRefreshing(true)
+        if (isMountedRef.current) {
+          setLoading(true)
+        }
       }
-      const res = await fetch("/api/v1/inquiries/admin", { credentials: "include" })
+      const res = await fetch("/api/v1/inquiries/admin", {
+        credentials: "include",
+        signal: controller.signal,
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to load inquiries")
-      setItems((data.data || []).map((item: any) => ({
-        ...item,
-        createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
-        updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
-        userLabel: item.userLabel || item.email || "Unknown User",
-        assignedStaff: item.assignedStaff || "Unassigned",
-      })))
+      if (isMountedRef.current) {
+        setItems((data.data || []).map((item: any) => ({
+          ...item,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+          userLabel: item.userLabel || item.email || "Unknown User",
+          assignedStaff: item.assignedStaff || "Unassigned",
+        })))
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to load inquiries")
-      setItems([])
+      if ((error as Error).name === "AbortError") return
+      if (isMountedRef.current) {
+        toast.error(error instanceof Error ? error.message : "Failed to load inquiries")
+        setItems([])
+      }
     } finally {
       if (showLoader) {
-        setLoading(false)
-      } else {
-        setRefreshing(false)
+        if (isMountedRef.current) {
+          setLoading(false)
+        }
       }
     }
   }, [])

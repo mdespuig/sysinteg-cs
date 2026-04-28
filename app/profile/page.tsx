@@ -157,11 +157,17 @@ export default function ProfilePage() {
       return
     }
 
+    let isActive = true
+    const controller = new AbortController()
+
     const loadProfile = async () => {
       if (!session?.user?.id) return
 
       try {
-        const response = await fetch(`/api/v1/profile?userId=${session.user.id}`)
+        const response = await fetch(`/api/v1/profile?userId=${session.user.id}`, {
+          signal: controller.signal,
+        })
+        if (!isActive) return
         const data = await response.json()
         if (response.ok && data.data) {
           setUseDefaultAvatarPreview(false)
@@ -175,11 +181,17 @@ export default function ProfilePage() {
           setProfileData(normalizeProfileData({ ...data.data, profileImage: nextImage }))
         }
       } catch (error) {
+        if ((error as Error).name === "AbortError") return
         console.error("Failed to load profile:", error)
       }
     }
 
     loadProfile()
+
+    return () => {
+      isActive = false
+      controller.abort()
+    }
   }, [session?.user?.id, status, router])
 
   const handleImageClick = () => {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import {
@@ -19,7 +19,7 @@ import {
   ArrowRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -64,6 +64,8 @@ interface FormData {
 
 export default function RequestInquiryPage() {
   const { data: session, status } = useSession()
+  const isMountedRef = useRef(true)
+  const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [generatedId, setGeneratedId] = useState("")
@@ -144,6 +146,8 @@ export default function RequestInquiryPage() {
       const response = await fetch(`/api/v1/profile?userId=${session.user.id}`)
       const data = await response.json().catch(() => ({}))
 
+      if (!isMountedRef.current) return
+
       const contactNumber =
         typeof data?.data?.personalData?.contactNumber === "string"
           ? data.data.personalData.contactNumber.trim()
@@ -178,12 +182,15 @@ export default function RequestInquiryPage() {
       }))
       setFillInformationFields(true)
     } catch (error) {
+      if (!isMountedRef.current) return
       console.error("Failed to load profile information:", error)
       toast.error("Failed to load profile information")
       setFillInformationFields(false)
       clearAutoFilledFields()
     } finally {
-      setIsLoadingProfileInfo(false)
+      if (isMountedRef.current) {
+        setIsLoadingProfileInfo(false)
+      }
     }
   }
 
@@ -229,8 +236,6 @@ export default function RequestInquiryPage() {
     setErrors({})
     
     try {
-      console.log("[v0] Submitting inquiry with data:", formData)
-      
       const response = await fetch("/api/v1/inquiries", {
         method: "POST",
         headers: {
@@ -238,40 +243,52 @@ export default function RequestInquiryPage() {
         },
         body: JSON.stringify(formData),
       })
-
-      console.log("[v0] Response status:", response.status)
       
       const data = await response.json()
-      console.log("[v0] Response data:", data)
+
+      if (!isMountedRef.current) return
 
       if (!response.ok) {
-        console.error("[v0] Server error:", data.error)
         setErrors({ details: data.error || "Failed to submit inquiry" })
-        setIsSubmitting(false)
         return
       }
 
       if (data.inquiryId) {
-        console.log("[v0] Inquiry submitted successfully with ID:", data.inquiryId)
         setGeneratedId(data.inquiryId)
         setIsSubmitted(true)
       } else {
-        console.error("[v0] No inquiry ID in response")
         setErrors({ details: "No inquiry ID returned from server" })
       }
     } catch (error) {
-      console.error("[v0] Error submitting inquiry:", error)
+      if (!isMountedRef.current) return
+      console.error("Error submitting inquiry:", error)
       setErrors({ details: error instanceof Error ? error.message : "Failed to submit inquiry. Please try again." })
     } finally {
-      setIsSubmitting(false)
+      if (isMountedRef.current) {
+        setIsSubmitting(false)
+      }
     }
   }
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(generatedId)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+
+    if (copyResetTimeoutRef.current) {
+      clearTimeout(copyResetTimeoutRef.current)
+    }
+
+    copyResetTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
   }
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const updateField = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))

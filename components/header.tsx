@@ -43,6 +43,8 @@ export function Header({ showRecordsNav = false }: HeaderProps) {
       return
     }
 
+    let isActive = true
+    const controller = new AbortController()
     const cacheKey = `profile-avatar:${userId}`
     const cachedImage = window.localStorage.getItem(cacheKey)
     setProfileImage(cachedImage || null)
@@ -60,12 +62,17 @@ export function Header({ showRecordsNav = false }: HeaderProps) {
       try {
         const response = await fetch(`/api/v1/profile?userId=${userId}`, {
           cache: "no-store",
+          signal: controller.signal,
         })
+
+        if (!isActive) return
+
         const data = await response.json()
         const nextImage = response.ok ? data.data?.profileImage ?? null : null
         setProfileImage(nextImage)
         window.localStorage.setItem(cacheKey, nextImage ?? "")
       } catch (error) {
+        if ((error as Error).name === "AbortError") return
         console.error("Failed to load header avatar:", error)
       }
     }
@@ -73,6 +80,8 @@ export function Header({ showRecordsNav = false }: HeaderProps) {
     loadAvatar()
 
     return () => {
+      isActive = false
+      controller.abort()
       window.removeEventListener("profile-avatar-updated", syncAvatar)
     }
   }, [session?.user?.id])
