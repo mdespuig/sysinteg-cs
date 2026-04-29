@@ -3,6 +3,29 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+  font-family: "SF Pro";
+  src:
+    url("./fonts/SF-Pro-Regular.otf") format("opentype"),
+    local("SF Pro Display"),
+    local("SF Pro Text"),
+    local("SF Pro");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Mono";
+  src:
+    url("./fonts/SF-Mono-Regular.otf") format("opentype"),
+    local("SF Mono"),
+    local("SFMono-Regular");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: oklch(0.98 0.01 220);
   --foreground: oklch(0.18 0.02 240);
@@ -81,8 +104,8 @@
 }
 
 @theme inline {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  --font-sans: "SF Pro", ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

@@ -405,9 +405,9 @@ export default function ViewInquiriesPage() {
                     <div className="flex items-center gap-2">
                       <Filter className="h-4 w-4 text-muted-foreground" />
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-36 bg-background">
-                        <SelectValue placeholder="Filter status" />
-                      </SelectTrigger>
+                        <SelectTrigger className="h-9 w-36 rounded-lg border-blue-100 bg-[#D2F1FF] text-slate-700 shadow-none">
+                          <SelectValue placeholder="Filter status" />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Status</SelectItem>
                           <SelectItem value="pending">Pending</SelectItem>
@@ -417,7 +417,7 @@ export default function ViewInquiriesPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button variant="outline" size="sm" asChild className="cursor-pointer bg-background">
+                    <Button asChild className="cursor-pointer">
                       <Link href="/support/request">
                         <Plus className="mr-1 h-4 w-4" />
                         New

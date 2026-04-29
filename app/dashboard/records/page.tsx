@@ -28,6 +28,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
@@ -55,6 +63,8 @@ export default function RecordsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
+  const [selectedInquiry, setSelectedInquiry] = useState<SortableInquiry | null>(null)
   const isMountedRef = useRef(true)
   const inquiriesControllerRef = useRef<AbortController | null>(null)
 
@@ -214,6 +224,20 @@ export default function RecordsPage() {
     return type.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
   }
 
+  const formatDateTime = (value?: Date | string) => {
+    const parsed = value instanceof Date ? value : value ? new Date(value) : null
+    if (!parsed || Number.isNaN(parsed.getTime())) {
+      return "N/A"
+    }
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(parsed)
+  }
+
   useEffect(() => {
     setPage(1)
   }, [search, pageSize, typeFilter, statusFilter])
@@ -238,6 +262,15 @@ export default function RecordsPage() {
 
   const handleBulkDelete = () => {
     openDeleteDialog(selectedIds)
+  }
+
+  const openInquiryDetails = (inquiry: SortableInquiry) => {
+    setSelectedInquiry(inquiry)
+    setDetailsDialogOpen(true)
+  }
+
+  const handleSeeMessagesPlaceholder = () => {
+    toast("See Messages is coming soon.")
   }
 
   const confirmDelete = async () => {
@@ -384,7 +417,7 @@ export default function RecordsPage() {
                     <th className="w-10 px-4 py-3 text-left">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-blue-300"
+                        className="h-4 w-4 cursor-pointer rounded border-blue-300 accent-[#006AEE] transition-transform duration-200 ease-out checked:scale-110"
                         checked={pageItems.length > 0 && pageItems.every((item) => selectedIds.includes(item.id))}
                         onChange={(e) => {
                           if (e.target.checked) {
@@ -409,7 +442,7 @@ export default function RecordsPage() {
                       <td className="px-4 py-3">
                         <input
                           type="checkbox"
-                          className="h-4 w-4 rounded border-blue-300"
+                          className="h-4 w-4 cursor-pointer rounded border-blue-300 accent-[#006AEE] transition-transform duration-200 ease-out checked:scale-110"
                           checked={selectedIds.includes(item.id)}
                           onChange={(e) => {
                             setSelectedIds((current) =>
@@ -420,7 +453,15 @@ export default function RecordsPage() {
                           }}
                         />
                       </td>
-                      <td className="px-4 py-3 font-medium text-slate-700">{item.id}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => openInquiryDetails(item)}
+                          className="cursor-pointer font-medium text-[#006AEE] underline-offset-2 transition-colors hover:text-[#0054BB] hover:underline"
+                        >
+                          {item.id}
+                        </button>
+                      </td>
                       <td className="px-4 py-3 text-slate-700">{item.userLabel}</td>
                       <td className="px-4 py-3 text-slate-700">{formatInquiryType(item.type)}</td>
                       <td className="px-4 py-3 text-slate-700">{getStatusLabel(item.status)}</td>
@@ -489,13 +530,18 @@ export default function RecordsPage() {
           </div>
 
           <div className="mt-8 flex items-center justify-between gap-3 text-sm">
-            {selectedCount > 0 ? (
-              <span className="text-slate-600">
+            <div className="relative h-5 min-w-[180px]">
+              <span
+                aria-live="polite"
+                className={`absolute left-0 top-0 text-slate-600 transition-all duration-200 ease-out ${
+                  selectedCount > 0
+                    ? "translate-y-0 opacity-100"
+                    : "-translate-y-1 opacity-0 pointer-events-none"
+                }`}
+              >
                 Selected {selectedCount} out of {selectedTotal}
               </span>
-            ) : (
-              <span />
-            )}
+            </div>
             <div className="flex items-center gap-3">
               <span className="text-slate-600">Page {safePage} of {totalPages}</span>
               <Button variant="ghost" size="icon" className="cursor-pointer" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
@@ -546,6 +592,105 @@ export default function RecordsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={detailsDialogOpen}
+        onOpenChange={(open) => {
+          setDetailsDialogOpen(open)
+          if (!open) {
+            setSelectedInquiry(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Inquiry Details</DialogTitle>
+            <DialogDescription>
+              Full details for inquiry {selectedInquiry?.id ?? "N/A"}.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedInquiry && (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Issue ID</p>
+                  <p className="text-sm font-medium text-foreground">{selectedInquiry.id}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <p className="text-sm font-medium text-foreground">{getStatusLabel(selectedInquiry.status)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Type</p>
+                  <p className="text-sm font-medium text-foreground">{formatInquiryType(selectedInquiry.type)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Assigned Staff</p>
+                  <p className="text-sm font-medium text-foreground">{selectedInquiry.assignedStaff ?? "Unassigned"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Created By</p>
+                  <p className="text-sm font-medium text-foreground">{selectedInquiry.userLabel ?? "Unknown User"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Patient Name</p>
+                  <p className="text-sm font-medium text-foreground">{selectedInquiry.patientName}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Contact Number</p>
+                  <p className="text-sm font-medium text-foreground">{selectedInquiry.contactNumber}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <p className="text-sm font-medium text-foreground">{selectedInquiry.email}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs text-muted-foreground">Address</p>
+                  <p className="text-sm font-medium text-foreground">{selectedInquiry.address}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Relationship</p>
+                  <p className="text-sm font-medium text-foreground">{selectedInquiry.relationship}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Created At</p>
+                  <p className="text-sm font-medium text-foreground">{formatDateTime(selectedInquiry.createdAt)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Updated At</p>
+                  <p className="text-sm font-medium text-foreground">{formatDateTime(selectedInquiry.updatedAt)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <p className="mb-1 text-xs text-muted-foreground">Details</p>
+                <p className="whitespace-pre-wrap text-sm font-light font-mono text-foreground">
+                  {selectedInquiry.details}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => setDetailsDialogOpen(false)}
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              className="cursor-pointer"
+              onClick={handleSeeMessagesPlaceholder}
+            >
+              See Messages
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

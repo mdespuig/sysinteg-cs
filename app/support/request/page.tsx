@@ -441,7 +441,7 @@ export default function RequestInquiryPage() {
                       checked={fillInformationFields}
                       onCheckedChange={handleFillInformationFieldsChange}
                       disabled={isLoadingProfileInfo || status === "loading"}
-                      className="mt-1 cursor-pointer"
+                      className="mt-1 h-4 w-4 cursor-pointer rounded border-blue-300 shadow-none transition-transform duration-200 ease-out data-[state=checked]:scale-110 data-[state=checked]:border-[#006AEE] data-[state=checked]:bg-[#006AEE] data-[state=checked]:text-white"
                     />
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">

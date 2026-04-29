@@ -83,9 +83,9 @@ export default function LandingPage() {
       <section id="services" className="scroll-mt-16 border-b">
         <div className="container mx-auto px-4 py-16 md:py-20">
           <div className="mb-12 text-center">
-            <h2 className="mb-4 text-3xl font-bold text-foreground">Our Services</h2>
+            <h2 className="mb-4 text-3xl font-bold text-foreground">Our Systems</h2>
             <p className="mx-auto max-w-4xl text-muted-foreground lg:whitespace-nowrap">
-              Comprehensive healthcare services designed to meet all your medical needs under one roof.
+              Comprehensive healthcare subsystems designed to meet all your medical needs under one roof.
             </p>
           </div>
 
