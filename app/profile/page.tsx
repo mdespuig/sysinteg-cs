@@ -110,6 +110,7 @@ export default function ProfilePage() {
   const isAdmin = role === "admin"
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false)
   const [imageError, setImageError] = useState("")
   const [useDefaultAvatarPreview, setUseDefaultAvatarPreview] = useState(false)
 
@@ -457,6 +458,43 @@ export default function ProfilePage() {
     }
   }
 
+  const handleAvatarSave = async () => {
+    if (!session?.user?.id) return
+
+    setIsSavingAvatar(true)
+
+    try {
+      const response = await fetch("/api/v1/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: session.user.id,
+          avatarOnly: true,
+          profileImage: profileData.profileImage,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "Failed to save avatar")
+
+      const nextImage = data.data?.profileImage ?? null
+      setUseDefaultAvatarPreview(false)
+      setProfileData((prev) => ({ ...prev, profileImage: nextImage }))
+      window.localStorage.setItem(`profile-avatar:${session.user.id}`, nextImage ?? "")
+      window.dispatchEvent(
+        new CustomEvent("profile-avatar-updated", {
+          detail: { userId: session.user.id, profileImage: nextImage },
+        })
+      )
+      toast.success("Avatar saved successfully!")
+    } catch (error) {
+      console.error("Avatar save failed:", error)
+      toast.error("Failed to save avatar")
+    } finally {
+      setIsSavingAvatar(false)
+    }
+  }
+
   const getInitials = () => {
     const username = session?.user?.name?.trim() || ""
     return username.charAt(0).toUpperCase() || "U"
@@ -532,10 +570,28 @@ export default function ProfilePage() {
                       type="button"
                       variant="outline"
                       onClick={restoreDefaultPhoto}
-                      disabled={!profileData.profileImage}
+                      disabled={!profileData.profileImage || isSavingAvatar}
                       className="w-44 cursor-pointer border border-input bg-zinc-700 text-white hover:border-[#006AEE] hover:bg-[#006AEE] hover:text-white disabled:opacity-50"
                     >
                       Restore Default
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleAvatarSave}
+                      disabled={isSavingAvatar || isSaving}
+                      className="w-44 cursor-pointer hover:bg-[#006AEE] hover:text-white"
+                    >
+                      {isSavingAvatar ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Save Avatar
+                        </>
+                      )}
                     </Button>
                     <p className="text-xs text-muted-foreground">JPG or PNG, max 5MB</p>
                     {imageError && (

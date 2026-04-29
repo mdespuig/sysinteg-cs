@@ -488,7 +488,7 @@ export async function updateConversationInquiryStatus(request: NextRequest) {
       const statusLabel = nextStatus === "resolved" ? "resolved" : "closed"
       const content =
         nextStatus === "resolved"
-          ? `Hello, ${inquiry.patientName || "there"}. This is ${actorName}. Your inquiry ${inquiry.id} has been successfully resolved. Thank you for giving us the opportunity to assist you.`
+          ? `Hello, ${inquiry.patientName || "there"}. Kindly be informed that your inquiry ${inquiry.id} has been successfully resolved. Thank you for allowing us to assist you. We would greatly appreciate your feedback and service rating.`
           : `Hello, ${inquiry.patientName || "there"}. This is ${actorName}. Your inquiry ${inquiry.id} has been closed. Thank you for contacting us about this concern.`
 
       await db.collection(MESSAGES_COLLECTION).insertOne({

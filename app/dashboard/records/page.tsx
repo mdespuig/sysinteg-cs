@@ -39,6 +39,8 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
 import { getStatusLabel, type Inquiry } from "@/lib/inquiry-data"
 import { Header } from "@/components/header"
@@ -49,6 +51,7 @@ type SortableInquiry = Inquiry & {
   userLabel?: string
   assignedStaff?: string
   assignedStaffId?: string | null
+  resolvedBy?: string | null
 }
 
 export default function RecordsPage() {
@@ -375,7 +378,7 @@ export default function RecordsPage() {
           <div className="w-[84px]" />
         </div>
 
-        <div className={isStaff ? "grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]" : ""}>
+        <div className={isStaff ? "grid gap-4 lg:grid-cols-[252px_minmax(0,1fr)_130px]" : "grid gap-4 lg:grid-cols-[minmax(0,1fr)_130px]"}>
         {isStaff ? (
           <aside className="h-fit rounded-3xl border border-blue-100 bg-white p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.08),0_12px_30px_rgba(59,130,246,0.08)]">
             <div className="mb-5">
@@ -421,84 +424,109 @@ export default function RecordsPage() {
         ) : null}
 
         <div className="min-w-0 rounded-3xl border border-blue-100 bg-[#F8FFFE] p-4 shadow-[0_0_0_1px_rgba(59,130,246,0.08),0_12px_30px_rgba(59,130,246,0.08)]">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-            <div className="flex gap-6">
-              <div>
-                <div className="mb-1 text-sm font-semibold text-blue-600">Show</div>
-                <Select value={pageSize} onValueChange={setPageSize}>
-                  <SelectTrigger className="h-10 w-28 rounded-lg border-blue-100 bg-[#D2F1FF] px-3 text-sm">
-                    <SelectValue className="text-slate-700" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5</SelectItem>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="mt-1 text-xs text-slate-600">Showing {filtered.length === 0 ? 0 : (safePage - 1) * size + 1} - {Math.min(safePage * size, filtered.length)} of {filtered.length}</div>
-              </div>
-              <div>
-                <div className="mb-1 text-sm font-semibold text-blue-600">Type</div>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="h-10 w-36 rounded-lg border-blue-100 bg-[#D2F1FF] px-3 text-sm">
-                    <SelectValue placeholder="Type" className="text-slate-700" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Type</SelectItem>
-                    <SelectItem value="appointment">Appointment</SelectItem>
-                    <SelectItem value="billing">Billing</SelectItem>
-                    <SelectItem value="medical-records">Medical Records</SelectItem>
-                    <SelectItem value="prescription">Prescription</SelectItem>
-                    <SelectItem value="insurance">Insurance</SelectItem>
-                    <SelectItem value="general">General</SelectItem>
-                    <SelectItem value="complaint">Complaint</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <div className="mb-1 text-sm font-semibold text-blue-600">Filter</div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-10 w-32 rounded-lg border-blue-100 bg-[#D2F1FF] px-3 text-sm">
-                    <SelectValue placeholder="Status" className="text-slate-700" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="in-progress">In Progress</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <div className="mb-1 text-sm font-semibold text-blue-600">Search</div>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-sky-400" />
-                  <Input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search..."
-                    className="h-10 w-56 rounded-lg border-0 bg-[#D2F1FF] pl-9 text-sm"
-                  />
+          <div className="flex flex-col gap-2 mb-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap items-end gap-4 lg:flex-nowrap">
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-blue-600">Show</div>
+                  <Select value={pageSize} onValueChange={setPageSize}>
+                    <SelectTrigger className="h-10 w-28 rounded-lg border-blue-100 bg-[#D2F1FF] px-3 text-sm">
+                      <SelectValue className="text-slate-700" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-blue-600">Type</div>
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="h-10 w-36 rounded-lg border-blue-100 bg-[#D2F1FF] px-3 text-sm">
+                      <SelectValue placeholder="Type" className="text-slate-700" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Type</SelectItem>
+                      <SelectItem value="appointment">Appointment</SelectItem>
+                      <SelectItem value="billing">Billing</SelectItem>
+                      <SelectItem value="medical-records">Medical Records</SelectItem>
+                      <SelectItem value="prescription">Prescription</SelectItem>
+                      <SelectItem value="insurance">Insurance</SelectItem>
+                      <SelectItem value="general">General</SelectItem>
+                      <SelectItem value="complaint">Complaint</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-blue-600">Filter</div>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="h-10 w-32 rounded-lg border-blue-100 bg-[#D2F1FF] px-3 text-sm">
+                      <SelectValue placeholder="Status" className="text-slate-700" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in-progress">In Progress</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-blue-600">Search</div>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-sky-400" />
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search..."
+                      className="h-10 w-48 rounded-lg border-0 bg-[#D2F1FF] pl-9 text-sm"
+                    />
+                  </div>
                 </div>
               </div>
+              <div className="flex shrink-0 gap-3 items-end">
+                {isAdmin ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          onClick={handleBulkDelete}
+                          disabled={selectedIds.length === 0}
+                          className="h-10 w-10 cursor-pointer rounded-lg border-blue-500 bg-[#F8FFFE] text-blue-600 hover:bg-[#006AEE] hover:text-[#F8FFFE] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#F8FFFE] disabled:hover:text-blue-600 p-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Delete</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : null}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={() => loadData()} className="h-10 w-10 cursor-pointer rounded-lg bg-[#006AEE] text-[#F8FFFE] border border-[#006AEE] hover:bg-[#F8FFFE] hover:text-[#006AEE] hover:border-[#006AEE] p-0">
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Refresh</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
-            <div className="flex gap-3">
-              {isAdmin ? (
-                <Button
-                  variant="outline"
-                  onClick={handleBulkDelete}
-                  disabled={selectedIds.length === 0}
-                  className="cursor-pointer rounded-lg border-blue-500 bg-[#F8FFFE] text-blue-600 hover:bg-[#006AEE] hover:text-[#F8FFFE] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#F8FFFE] disabled:hover:text-blue-600"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <div className="text-slate-600">Showing {filtered.length === 0 ? 0 : (safePage - 1) * size + 1} - {Math.min(safePage * size, filtered.length)} of {filtered.length}</div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-600">Page {safePage} of {totalPages}</span>
+                <Button variant="ghost" size="icon" className="cursor-pointer h-8 w-8" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                  <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
-              ) : null}
-              <Button onClick={() => loadData()} className="cursor-pointer rounded-lg bg-[#006AEE] text-[#F8FFFE] border border-[#006AEE] hover:bg-[#F8FFFE] hover:text-[#006AEE] hover:border-[#006AEE]">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Refresh
-              </Button>
+                <Button variant="ghost" size="icon" className="cursor-pointer h-8 w-8" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -571,7 +599,16 @@ export default function RecordsPage() {
                       </td>
                       <td className="px-4 py-3 text-slate-700">{item.userLabel}</td>
                       <td className="px-4 py-3 text-slate-700">{formatInquiryType(item.type)}</td>
-                      <td className="px-4 py-3 text-slate-700">{getStatusLabel(item.status)}</td>
+                      <td className="px-4 py-3 text-slate-700">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{getStatusLabel(item.status)}</span>
+                          {isStaff && item.status === "resolved" && (item.resolvedBy === staffId || item.assignedStaffId === staffId) ? (
+                            <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                              Resolved by you
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-slate-700">{item.assignedStaff}</td>
                       <td className="px-4 py-3 text-right">
                         {isAdmin ? (
@@ -589,79 +626,54 @@ export default function RecordsPage() {
               </table>
             </div>
           )}
-
-          <div className="mt-10 rounded-3xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                  Record Summary
-                </h2>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <div className="mb-2 flex items-center gap-2">
-                  <ListTodo className="h-4 w-4 text-primary" />
-                  <p className="text-xs text-muted-foreground">Total Inquiries</p>
-                </div>
-                <p className="text-xl font-semibold">{summary.total}</p>
-              </div>
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <div className="mb-2 flex items-center gap-2">
-                  <CircleDot className="h-4 w-4 text-amber-500" />
-                  <p className="text-xs text-muted-foreground">Pending</p>
-                </div>
-                <p className="text-xl font-semibold">{summary.pending}</p>
-              </div>
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <div className="mb-2 flex items-center gap-2">
-                  <PlayCircle className="h-4 w-4 text-blue-500" />
-                  <p className="text-xs text-muted-foreground">In Progress</p>
-                </div>
-                <p className="text-xl font-semibold">{summary.inProgress}</p>
-              </div>
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <div className="mb-2 flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  <p className="text-xs text-muted-foreground">Resolved</p>
-                </div>
-                <p className="text-xl font-semibold">{summary.resolved}</p>
-              </div>
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <div className="mb-2 flex items-center gap-2">
-                  <Clock3 className="h-4 w-4 text-slate-500" />
-                  <p className="text-xs text-muted-foreground">Closed</p>
-                </div>
-                <p className="text-xl font-semibold">{summary.closed}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 flex items-center justify-between gap-3 text-sm">
-            <div className="relative h-5 min-w-[180px]">
-              <span
-                aria-live="polite"
-                className={`absolute left-0 top-0 text-slate-600 transition-all duration-200 ease-out ${
-                  selectedCount > 0
-                    ? "translate-y-0 opacity-100"
-                    : "-translate-y-1 opacity-0 pointer-events-none"
-                }`}
-              >
-                Selected {selectedCount} out of {selectedTotal}
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-slate-600">Page {safePage} of {totalPages}</span>
-              <Button variant="ghost" size="icon" className="cursor-pointer" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="cursor-pointer" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
         </div>
+
+        <aside className="h-fit rounded-3xl border border-slate-200 bg-white px-2.5 py-4 shadow-sm">
+          <div className="mb-4">
+            <h2 className="text-center text-xs font-semibold uppercase leading-tight tracking-[0.1em] text-slate-500">
+              <span className="block">Record</span>
+              <span className="block">Summary</span>
+            </h2>
+          </div>
+
+          <div className="space-y-2">
+            <div className="rounded-lg border bg-muted/30 px-2 py-2">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <ListTodo className="h-3.5 w-3.5 text-primary" />
+                <p className="text-[10px] text-muted-foreground">Total Inquiries</p>
+              </div>
+              <p className="text-lg font-semibold">{summary.total}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 px-2 py-2">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <CircleDot className="h-3.5 w-3.5 text-amber-500" />
+                <p className="text-[10px] text-muted-foreground">Pending</p>
+              </div>
+              <p className="text-lg font-semibold">{summary.pending}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 px-2 py-2">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <PlayCircle className="h-3.5 w-3.5 text-blue-500" />
+                <p className="text-[10px] text-muted-foreground">In Progress</p>
+              </div>
+              <p className="text-lg font-semibold">{summary.inProgress}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 px-2 py-2">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                <p className="text-[10px] text-muted-foreground">Resolved</p>
+              </div>
+              <p className="text-lg font-semibold">{summary.resolved}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 px-2 py-2">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <Clock3 className="h-3.5 w-3.5 text-slate-500" />
+                <p className="text-[10px] text-muted-foreground">Closed</p>
+              </div>
+              <p className="text-lg font-semibold">{summary.closed}</p>
+            </div>
+          </div>
+        </aside>
         </div>
       </div>
 
@@ -792,7 +804,8 @@ export default function RecordsPage() {
               Close
             </Button>
             {isStaff && selectedInquiry ? (
-              selectedInquiry.assignedStaffId === staffId && selectedInquiry.status === "in-progress" ? (
+              selectedInquiry.assignedStaffId === staffId &&
+              (selectedInquiry.status === "in-progress" || selectedInquiry.status === "resolved") ? (
                 <Button type="button" className="cursor-pointer" asChild>
                   <Link href={`/support/messages/${encodeURIComponent(selectedInquiry.id)}`}>
                     <MessageCircle className="mr-2 h-4 w-4" />

@@ -68,13 +68,21 @@ export async function getProfile(request: NextRequest) {
 export async function updateProfile(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, isAdmin, profileImage = null, personalData, emergencyContact, cropMode = false } = body
+    const {
+      userId,
+      isAdmin,
+      avatarOnly = false,
+      profileImage = null,
+      personalData,
+      emergencyContact,
+      cropMode = false,
+    } = body
 
     if (!userId || !isValidObjectId(userId)) {
       return NextResponse.json({ error: "Valid userId is required" }, { status: 400 })
     }
 
-    if (!isAdmin && (!personalData || !emergencyContact)) {
+    if (!avatarOnly && !isAdmin && (!personalData || !emergencyContact)) {
       return NextResponse.json({ error: "Profile data is required" }, { status: 400 })
     }
 
@@ -96,6 +104,32 @@ export async function updateProfile(request: NextRequest) {
       )
     }
 
+    const now = new Date()
+
+    if (avatarOnly) {
+      await profiles.updateOne(
+        { userId },
+        {
+          $set: {
+            userId,
+            profileImage,
+            email: user?.email ?? existingProfile?.email ?? null,
+            updatedAt: now,
+          },
+          $setOnInsert: {
+            createdAt: now,
+          },
+        },
+        { upsert: true }
+      )
+
+      const savedProfile = await profiles.findOne({ userId })
+      return NextResponse.json(
+        { message: "Avatar saved successfully", data: savedProfile },
+        { status: 200 }
+      )
+    }
+
     const normalizedPersonalContactNumber = normalizePhoneNumber(personalData?.contactNumber)
     const normalizedEmergencyContactNumber = normalizePhoneNumber(emergencyContact?.contactNumber)
 
@@ -105,8 +139,6 @@ export async function updateProfile(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    const now = new Date()
 
     const setData: Record<string, unknown> = {
       userId,

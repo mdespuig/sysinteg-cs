@@ -1008,7 +1008,7 @@ export default function InquiryMessagesPage() {
       </main>
 
       <Dialog open={mediaModal !== null} onOpenChange={(open) => !open && setMediaModal(null)}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl [&>button]:cursor-pointer">
           <DialogHeader>
             <DialogTitle>
               {mediaModal === "images" ? "Images" : mediaModal === "files" ? "Files" : "Links"}
@@ -1030,10 +1030,13 @@ export default function InquiryMessagesPage() {
                     key={`${attachment.name}-${index}`}
                     type="button"
                     onClick={() => setImagePreview(attachment)}
-                    className="overflow-hidden rounded-lg border bg-slate-50 text-left"
+                    className="cursor-pointer overflow-hidden rounded-lg border bg-slate-50 text-left transition hover:bg-slate-100"
                   >
                     <img src={attachment.url} alt={attachment.name} className="aspect-square w-full object-cover" />
-                    <p className="truncate px-2 py-1 text-xs text-slate-500">{attachment.name}</p>
+                    <div className="flex items-center gap-2 px-2 py-1 text-xs text-slate-500">
+                      <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
+                      <Download className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                    </div>
                   </button>
                 ))}
               </div>
@@ -1054,6 +1057,7 @@ export default function InquiryMessagesPage() {
                   >
                     <FileText className="h-4 w-4 shrink-0 text-[#006AEE]" />
                     <span className="min-w-0 flex-1 truncate text-slate-800">{attachment.name}</span>
+                    <Download className="h-4 w-4 shrink-0 text-slate-800" />
                     <span className="text-xs text-slate-400">{Math.ceil(attachment.size / 1024)} KB</span>
                   </a>
                 ))}
@@ -1087,10 +1091,10 @@ export default function InquiryMessagesPage() {
       </Dialog>
 
       <Dialog open={imagePreview !== null} onOpenChange={(open) => !open && setImagePreview(null)}>
-        <DialogContent className="border-0 bg-[#F1FBFF] p-6 shadow-2xl sm:max-w-4xl [&>button]:right-3 [&>button]:top-3 [&>button]:rounded-md [&>button]:border [&>button]:border-[#006AEE] [&>button]:bg-white/80 [&>button]:text-[#006AEE] [&>button]:opacity-100 [&>button]:hover:bg-white">
+        <DialogContent className="border-0 bg-[#F1FBFF] p-6 shadow-2xl sm:max-w-4xl [&>button]:cursor-pointer [&>button]:opacity-70 [&>button]:hover:opacity-100">
           <DialogHeader className="pr-14">
             <DialogTitle className="text-xl font-bold text-slate-950">{imagePreview?.name || "Image preview"}</DialogTitle>
-            <DialogDescription className="text-sm text-slate-500">Preview shared image.</DialogDescription>
+            <DialogDescription className="text-sm text-slate-500">Image Preview</DialogDescription>
           </DialogHeader>
           {imagePreview ? (
             <Button asChild size="icon" className="absolute right-14 top-6 z-10 h-10 w-10 cursor-pointer rounded-lg bg-[#006AEE] text-white hover:bg-[#0054BB]">
@@ -1100,7 +1104,7 @@ export default function InquiryMessagesPage() {
             </Button>
           ) : null}
           {imagePreview ? (
-            <div className="mt-4 flex max-h-[70vh] items-center justify-center overflow-auto rounded-lg bg-white p-4">
+            <div className="mt-4 flex max-h-[70vh] items-center justify-center overflow-auto rounded-lg bg-transparent p-4">
               <img src={imagePreview.url} alt={imagePreview.name} className="max-h-[64vh] w-auto max-w-full object-contain" />
             </div>
           ) : null}
