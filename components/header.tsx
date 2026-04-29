@@ -17,9 +17,10 @@ import { toast } from "sonner"
 
 type HeaderProps = {
   showRecordsNav?: boolean
+  hidePrivilegedNav?: boolean
 }
 
-export function Header({ showRecordsNav = false }: HeaderProps) {
+export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: HeaderProps) {
   const { data: session } = useSession()
   const role = (session?.user as any)?.role
   const isPrivilegedUser = role === "admin" || role === "staff"
@@ -86,6 +87,44 @@ export function Header({ showRecordsNav = false }: HeaderProps) {
     }
   }, [session?.user?.id])
 
+  useEffect(() => {
+    if (!session?.user?.id) return
+
+    let isActive = true
+
+    const sendHeartbeat = async () => {
+      try {
+        if (!isActive) return
+        await fetch("/api/v1/presence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          cache: "no-store",
+          body: JSON.stringify({ state: "online" }),
+        })
+      } catch {
+        return
+      }
+    }
+
+    const sendOffline = () => {
+      const payload = new Blob([JSON.stringify({ state: "offline" })], {
+        type: "application/json",
+      })
+      navigator.sendBeacon?.("/api/v1/presence", payload)
+    }
+
+    void sendHeartbeat()
+    const interval = window.setInterval(sendHeartbeat, 15000)
+    window.addEventListener("pagehide", sendOffline)
+
+    return () => {
+      isActive = false
+      window.clearInterval(interval)
+      window.removeEventListener("pagehide", sendOffline)
+    }
+  }, [session?.user?.id])
+
   const avatarLetter = session?.user?.name?.[0]?.toUpperCase() || "U"
 
   return (
@@ -99,7 +138,7 @@ export function Header({ showRecordsNav = false }: HeaderProps) {
         </Link>
 
         <nav className="hidden items-center justify-center gap-8 lg:gap-10 md:flex justify-self-center">
-          {isPrivilegedUser ? (
+          {isPrivilegedUser && !hidePrivilegedNav ? (
             <>
               <Link href="/dashboard" className="whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
                 Dashboard
@@ -110,7 +149,7 @@ export function Header({ showRecordsNav = false }: HeaderProps) {
                 </Link>
               ) : null}
             </>
-          ) : (
+          ) : !isPrivilegedUser ? (
             <>
               <Link href="/support" className="whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
                 Contact Support
@@ -122,7 +161,7 @@ export function Header({ showRecordsNav = false }: HeaderProps) {
                 Other Systems
               </Link>
             </>
-          )}
+          ) : null}
         </nav>
 
         <div className="flex items-center justify-self-end gap-2">

@@ -12,6 +12,7 @@ import {
   Clock3,
   ListTodo,
   Loader2,
+  MessageCircle,
   PlayCircle,
   RefreshCw,
   Search,
@@ -47,6 +48,7 @@ type SortableInquiry = Inquiry & {
   _id?: string
   userLabel?: string
   assignedStaff?: string
+  assignedStaffId?: string | null
 }
 
 export default function RecordsPage() {
@@ -63,12 +65,16 @@ export default function RecordsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
+  const [assigningInquiryId, setAssigningInquiryId] = useState<string | null>(null)
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
   const [selectedInquiry, setSelectedInquiry] = useState<SortableInquiry | null>(null)
   const isMountedRef = useRef(true)
   const inquiriesControllerRef = useRef<AbortController | null>(null)
 
   const isAdmin = (session?.user as any)?.role === "admin"
+  const isStaff = (session?.user as any)?.role === "staff"
+  const staffId = (session?.user as any)?.id as string | undefined
+  const canViewRecords = isAdmin || isStaff
 
   useEffect(() => {
     return () => {
@@ -86,20 +92,15 @@ export default function RecordsPage() {
 
     const role = (session.user as any)?.role
 
-    if (role === "staff") {
-      router.replace("/dashboard")
-      return
-    }
-
     if (role === "standard") {
       router.replace("/")
       return
     }
 
-    if (!isAdmin) {
+    if (!canViewRecords) {
       router.replace("/")
     }
-  }, [status, session, isAdmin, router])
+  }, [status, session, canViewRecords, router])
 
   const loadData = useCallback(async (showLoader = false) => {
     try {
@@ -143,7 +144,7 @@ export default function RecordsPage() {
   }, [])
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (!canViewRecords) return
 
     void loadData(true)
     const interval = setInterval(() => {
@@ -151,7 +152,7 @@ export default function RecordsPage() {
     }, 10000)
 
     return () => clearInterval(interval)
-  }, [isAdmin, loadData])
+  }, [canViewRecords, loadData])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -200,6 +201,25 @@ export default function RecordsPage() {
   const pageItems = filtered.slice((safePage - 1) * size, safePage * size)
   const selectedCount = selectedIds.length
   const selectedTotal = filtered.length
+  const staffCurrentInquiry = useMemo(() => {
+    if (!staffId) return null
+    return items.find((item) => item.assignedStaffId === staffId && item.status === "in-progress") || null
+  }, [items, staffId])
+  const staffStats = useMemo(() => {
+    if (!staffId) {
+      return {
+        available: 0,
+        unresolved: 0,
+        resolved: 0,
+      }
+    }
+
+    return {
+      available: items.filter((item) => item.status === "pending").length,
+      unresolved: staffCurrentInquiry ? 1 : 0,
+      resolved: items.filter((item) => item.assignedStaffId === staffId && item.status === "resolved").length,
+    }
+  }, [items, staffCurrentInquiry, staffId])
   const summary = useMemo(() => {
     return items.reduce(
       (acc, item) => {
@@ -273,6 +293,42 @@ export default function RecordsPage() {
     toast("See Messages is coming soon.")
   }
 
+  const handleAssignInquiry = async (inquiryId: string) => {
+    if (assigningInquiryId) return
+
+    setAssigningInquiryId(inquiryId)
+    try {
+      const res = await fetch("/api/v1/inquiries/admin", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ inquiryId }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to assign inquiry")
+      }
+
+      toast.success("Inquiry assigned to you")
+      await loadData()
+      const assigned = items.find((item) => item.id === inquiryId)
+      if (assigned) {
+        setSelectedInquiry({
+          ...assigned,
+          status: "in-progress",
+          assignedStaffId: staffId,
+          assignedStaff: session?.user?.name || "Assigned Staff",
+          updatedAt: new Date(),
+        })
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to assign inquiry")
+    } finally {
+      setAssigningInquiryId(null)
+    }
+  }
+
   const confirmDelete = async () => {
     if (deleteTargetIds.length === 0) return
 
@@ -299,14 +355,14 @@ export default function RecordsPage() {
     }
   }
 
-  if (status === "loading" || (session && !isAdmin)) {
+  if (status === "loading" || (session && !canViewRecords)) {
     return <div className="min-h-screen flex items-center justify-center bg-white" />
   }
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl px-4">
 
         <div className="mt-6 mb-6 flex items-center justify-between">
           <Button variant="ghost" asChild className="cursor-pointer">
@@ -319,7 +375,52 @@ export default function RecordsPage() {
           <div className="w-[84px]" />
         </div>
 
-        <div className="rounded-3xl border border-blue-100 bg-[#F8FFFE] p-4 shadow-[0_0_0_1px_rgba(59,130,246,0.08),0_12px_30px_rgba(59,130,246,0.08)]">
+        <div className={isStaff ? "grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]" : ""}>
+        {isStaff ? (
+          <aside className="h-fit rounded-3xl border border-blue-100 bg-white p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.08),0_12px_30px_rgba(59,130,246,0.08)]">
+            <div className="mb-5">
+              <h2 className="text-lg font-semibold text-slate-950">Your Inquiries</h2>
+              <p className="mt-1 text-xs text-slate-500">Current staff workload</p>
+            </div>
+            <div className="space-y-3">
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <CircleDot className="h-4 w-4 text-amber-500" />
+                  <p className="text-xs text-muted-foreground">Available Issues</p>
+                </div>
+                <p className="text-2xl font-semibold">{staffStats.available}</p>
+                <p className="mt-1 text-[11px] text-slate-500">Pending inquiries</p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <PlayCircle className="h-4 w-4 text-blue-500" />
+                  <p className="text-xs text-muted-foreground">Unresolved</p>
+                </div>
+                <p className="text-2xl font-semibold">{staffStats.unresolved}</p>
+                <p className="mt-1 truncate text-[11px] text-slate-500">
+                  {staffCurrentInquiry ? staffCurrentInquiry.id : "No current ticket"}
+                </p>
+                {staffCurrentInquiry ? (
+                  <Button asChild size="sm" className="mt-3 h-8 w-full cursor-pointer rounded-lg bg-[#006AEE] text-xs text-white hover:bg-[#0054BB]">
+                    <Link href={`/support/messages/${encodeURIComponent(staffCurrentInquiry.id)}`}>
+                      Work on your current ticket
+                    </Link>
+                  </Button>
+                ) : null}
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <p className="text-xs text-muted-foreground">Resolved</p>
+                </div>
+                <p className="text-2xl font-semibold">{staffStats.resolved}</p>
+                <p className="mt-1 text-[11px] text-slate-500">Resolved by you</p>
+              </div>
+            </div>
+          </aside>
+        ) : null}
+
+        <div className="min-w-0 rounded-3xl border border-blue-100 bg-[#F8FFFE] p-4 shadow-[0_0_0_1px_rgba(59,130,246,0.08),0_12px_30px_rgba(59,130,246,0.08)]">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
             <div className="flex gap-6">
               <div>
@@ -383,15 +484,17 @@ export default function RecordsPage() {
               </div>
             </div>
             <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={handleBulkDelete}
-                disabled={selectedIds.length === 0}
-                className="cursor-pointer rounded-lg border-blue-500 bg-[#F8FFFE] text-blue-600 hover:bg-[#006AEE] hover:text-[#F8FFFE] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#F8FFFE] disabled:hover:text-blue-600"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
+              {isAdmin ? (
+                <Button
+                  variant="outline"
+                  onClick={handleBulkDelete}
+                  disabled={selectedIds.length === 0}
+                  className="cursor-pointer rounded-lg border-blue-500 bg-[#F8FFFE] text-blue-600 hover:bg-[#006AEE] hover:text-[#F8FFFE] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#F8FFFE] disabled:hover:text-blue-600"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              ) : null}
               <Button onClick={() => loadData()} className="cursor-pointer rounded-lg bg-[#006AEE] text-[#F8FFFE] border border-[#006AEE] hover:bg-[#F8FFFE] hover:text-[#006AEE] hover:border-[#006AEE]">
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Refresh
@@ -414,20 +517,22 @@ export default function RecordsPage() {
               <table className="w-full border-collapse text-sm">
                 <thead className="bg-[#F8FFFE] text-blue-600">
                   <tr className="border-b border-blue-100">
-                    <th className="w-10 px-4 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 cursor-pointer rounded border-blue-300 accent-[#006AEE] transition-transform duration-200 ease-out checked:scale-110"
-                        checked={pageItems.length > 0 && pageItems.every((item) => selectedIds.includes(item.id))}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedIds((current) => Array.from(new Set([...current, ...pageItems.map((item) => item.id)])))
-                          } else {
-                            setSelectedIds((current) => current.filter((id) => !pageItems.some((item) => item.id === id)))
-                          }
-                        }}
-                      />
-                    </th>
+                    {isAdmin ? (
+                      <th className="w-10 px-4 py-3 text-left">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 cursor-pointer rounded border-blue-300 accent-[#006AEE] transition-transform duration-200 ease-out checked:scale-110"
+                          checked={pageItems.length > 0 && pageItems.every((item) => selectedIds.includes(item.id))}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds((current) => Array.from(new Set([...current, ...pageItems.map((item) => item.id)])))
+                            } else {
+                              setSelectedIds((current) => current.filter((id) => !pageItems.some((item) => item.id === id)))
+                            }
+                          }}
+                        />
+                      </th>
+                    ) : null}
                     <th className="px-4 py-3 text-left font-semibold">Issue ID</th>
                     <th className="px-4 py-3 text-left font-semibold">User</th>
                     <th className="px-4 py-3 text-left font-semibold">Type</th>
@@ -439,20 +544,22 @@ export default function RecordsPage() {
                 <tbody>
                   {pageItems.map((item) => (
                     <tr key={item.id} className="border-b border-slate-100 bg-[#F8FFFE] transition-colors hover:bg-[#ABE4FD]">
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 cursor-pointer rounded border-blue-300 accent-[#006AEE] transition-transform duration-200 ease-out checked:scale-110"
-                          checked={selectedIds.includes(item.id)}
-                          onChange={(e) => {
-                            setSelectedIds((current) =>
-                              e.target.checked
-                                ? [...current, item.id]
-                                : current.filter((id) => id !== item.id)
-                            )
-                          }}
-                        />
-                      </td>
+                      {isAdmin ? (
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 cursor-pointer rounded border-blue-300 accent-[#006AEE] transition-transform duration-200 ease-out checked:scale-110"
+                            checked={selectedIds.includes(item.id)}
+                            onChange={(e) => {
+                              setSelectedIds((current) =>
+                                e.target.checked
+                                  ? [...current, item.id]
+                                  : current.filter((id) => id !== item.id)
+                              )
+                            }}
+                          />
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3">
                         <button
                           type="button"
@@ -467,12 +574,14 @@ export default function RecordsPage() {
                       <td className="px-4 py-3 text-slate-700">{getStatusLabel(item.status)}</td>
                       <td className="px-4 py-3 text-slate-700">{item.assignedStaff}</td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="cursor-pointer rounded-md border border-blue-100 bg-[#F8FFFE] px-3 py-1 text-xs font-medium text-blue-600 hover:border-[#006AEE] hover:bg-[#006AEE] hover:text-[#F8FFFE]"
-                        >
-                          <Trash2 className="inline-block h-3.5 w-3.5" />
-                        </button>
+                        {isAdmin ? (
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="cursor-pointer rounded-md border border-blue-100 bg-[#F8FFFE] px-3 py-1 text-xs font-medium text-blue-600 hover:border-[#006AEE] hover:bg-[#006AEE] hover:text-[#F8FFFE]"
+                          >
+                            <Trash2 className="inline-block h-3.5 w-3.5" />
+                          </button>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
@@ -552,6 +661,7 @@ export default function RecordsPage() {
               </Button>
             </div>
           </div>
+        </div>
         </div>
       </div>
 
@@ -681,13 +791,41 @@ export default function RecordsPage() {
             >
               Close
             </Button>
-            <Button
-              type="button"
-              className="cursor-pointer"
-              onClick={handleSeeMessagesPlaceholder}
-            >
-              See Messages
-            </Button>
+            {isStaff && selectedInquiry ? (
+              selectedInquiry.assignedStaffId === staffId && selectedInquiry.status === "in-progress" ? (
+                <Button type="button" className="cursor-pointer" asChild>
+                  <Link href={`/support/messages/${encodeURIComponent(selectedInquiry.id)}`}>
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    See Messages
+                  </Link>
+                </Button>
+              ) : selectedInquiry.status === "pending" && !selectedInquiry.assignedStaffId && !staffCurrentInquiry ? (
+                <Button
+                  type="button"
+                  className="cursor-pointer"
+                  disabled={assigningInquiryId === selectedInquiry.id}
+                  onClick={() => void handleAssignInquiry(selectedInquiry.id)}
+                >
+                  {assigningInquiryId === selectedInquiry.id ? "Assigning..." : "Assign to Me"}
+                </Button>
+              ) : (
+                <Button type="button" disabled>
+                  {staffCurrentInquiry
+                    ? "Current ticket active"
+                    : selectedInquiry.assignedStaffId
+                      ? "Assigned to another staff"
+                      : "Messages unavailable"}
+                </Button>
+              )
+            ) : (
+              <Button
+                type="button"
+                className="cursor-pointer"
+                onClick={handleSeeMessagesPlaceholder}
+              >
+                See Messages
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,0 +1,1198 @@
+"use client"
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
+import { redirect, useParams } from "next/navigation"
+import { useSession } from "next-auth/react"
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  Clock3,
+  Download,
+  FileImage,
+  FileText,
+  Image,
+  LinkIcon,
+  Mail,
+  MessageCircle,
+  MessageCircleX,
+  Paperclip,
+  Phone,
+  Search,
+  Send,
+  Smile,
+  UserCheck,
+  X,
+} from "lucide-react"
+import { toast } from "sonner"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Header } from "@/components/header"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
+import type { AssignedStaffInfo } from "@/lib/conversation-data"
+
+type Message = {
+  _id: string
+  senderId: string
+  senderName: string
+  senderRole: "standard" | "staff" | "admin"
+  content: string
+  attachments?: MessageAttachment[]
+  createdAt: string
+  pending?: boolean
+}
+
+type MessageAttachment = {
+  kind: "image" | "file"
+  name: string
+  type: string
+  size: number
+  url: string
+}
+
+type MediaModal = "images" | "files" | "links" | null
+
+type ConversationPayload = {
+  conversation: {
+    id: string
+    inquiryId: string
+    status: string
+    socketEndpoint: string
+  }
+  inquiry: {
+    id: string
+    type: string
+    status: string
+    patientName: string
+    email?: string
+    contactNumber?: string
+    relationship?: string
+    details?: string
+  }
+  assignedStaff: AssignedStaffInfo
+  inquiryUser: AssignedStaffInfo
+  conversationPeer: AssignedStaffInfo
+  typing?: {
+    isPeerTyping: boolean
+  }
+  messages: Message[]
+}
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "S"
+}
+
+function formatMessageTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date)
+}
+
+function formatDateDivider(value?: string) {
+  const date = value ? new Date(value) : new Date()
+  if (Number.isNaN(date.getTime())) return "Today"
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  })
+    .format(date)
+    .toUpperCase()
+}
+
+export default function InquiryMessagesPage() {
+  const params = useParams<{ inquiryId: string }>()
+  const inquiryId = decodeURIComponent(params.inquiryId || "").toUpperCase()
+  const { data: session, status } = useSession()
+  const [data, setData] = useState<ConversationPayload | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [draft, setDraft] = useState("")
+  const [attachments, setAttachments] = useState<MessageAttachment[]>([])
+  const [emojiOpen, setEmojiOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState<"resolved" | "closed" | null>(null)
+  const [statusConfirm, setStatusConfirm] = useState<"resolved" | "closed" | null>(null)
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false)
+  const [mediaModal, setMediaModal] = useState<MediaModal>(null)
+  const [imagePreview, setImagePreview] = useState<MessageAttachment | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0)
+  const [peerTyping, setPeerTyping] = useState(false)
+  const [error, setError] = useState("")
+  const [socketState, setSocketState] = useState<"connecting" | "connected" | "polling">("connecting")
+  const viewportRef = useRef<HTMLDivElement | null>(null)
+  const socketRef = useRef<WebSocket | null>(null)
+  const messagesRef = useRef<Message[]>([])
+  const shouldStickToBottomRef = useRef(true)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const typingTimeoutRef = useRef<number | null>(null)
+  const typingActiveRef = useRef(false)
+
+  if (status === "unauthenticated") {
+    redirect("/auth/login")
+  }
+
+  const role = (session?.user as any)?.role
+  const canAccessConversation = role === "standard" || role === "staff" || role === "admin"
+
+  useEffect(() => {
+    if (status === "loading") return
+    if (session && !canAccessConversation) {
+      toast.error("You have no access to this conversation")
+      redirect("/")
+    }
+  }, [status, session, canAccessConversation])
+
+  const loadConversation = useCallback(
+    async (showLoader = false) => {
+      if (!inquiryId) return
+
+      try {
+        if (showLoader) setLoading(true)
+        const res = await fetch(`/api/v1/conversations?inquiryId=${encodeURIComponent(inquiryId)}`, {
+          credentials: "include",
+          cache: "no-store",
+        })
+        const payload = await res.json()
+
+        if (!res.ok) {
+          throw new Error(payload.error || "Failed to load conversation")
+        }
+
+        const nextMessages = payload.data.messages || []
+        setData(payload.data)
+        setPeerTyping(Boolean(payload.data.typing?.isPeerTyping))
+        setMessages((current) => {
+          const pendingMessages = current.filter((message) => message.pending)
+          const nextIds = new Set(nextMessages.map((message: Message) => message._id))
+          return [
+            ...nextMessages,
+            ...pendingMessages.filter((message) => !nextIds.has(message._id)),
+          ]
+        })
+        setError("")
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load conversation")
+        if (showLoader) {
+          setData(null)
+          setMessages([])
+        }
+      } finally {
+        if (showLoader) setLoading(false)
+      }
+    },
+    [inquiryId]
+  )
+
+  useEffect(() => {
+    if (status !== "authenticated" || !canAccessConversation) return
+    void loadConversation(true)
+  }, [status, canAccessConversation, loadConversation])
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  useEffect(() => {
+    const viewport = viewportRef.current?.querySelector("[data-radix-scroll-area-viewport]") as HTMLElement | null
+    if (viewport && shouldStickToBottomRef.current) {
+      viewport.scrollTop = viewport.scrollHeight
+    }
+  }, [messages])
+
+  useEffect(() => {
+    const viewport = viewportRef.current?.querySelector("[data-radix-scroll-area-viewport]") as HTMLElement | null
+    if (!viewport) return
+
+    const handleScroll = () => {
+      const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
+      shouldStickToBottomRef.current = distanceFromBottom < 120
+    }
+
+    viewport.addEventListener("scroll", handleScroll)
+    handleScroll()
+
+    return () => viewport.removeEventListener("scroll", handleScroll)
+  }, [loading])
+
+  useEffect(() => {
+    if (!data?.conversation.socketEndpoint) return
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+    const socketUrl = `${protocol}//${window.location.host}${data.conversation.socketEndpoint}`
+    const socket = new WebSocket(socketUrl)
+    socketRef.current = socket
+
+    socket.onopen = () => {
+      setSocketState("connected")
+      socket.send(JSON.stringify({ type: "conversation.subscribe", inquiryId }))
+    }
+
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        if (payload.type === "conversation.message.created" && payload.message) {
+          setMessages((current) => {
+            if (current.some((message) => message._id === payload.message._id)) return current
+            return [...current, payload.message]
+          })
+        }
+      } catch {
+        return
+      }
+    }
+
+    socket.onerror = () => {
+      setSocketState("polling")
+    }
+
+    socket.onclose = () => {
+      setSocketState((current) => (current === "connected" ? "polling" : current))
+    }
+
+    return () => {
+      socket.close()
+    }
+  }, [data?.conversation.socketEndpoint, inquiryId])
+
+  useEffect(() => {
+    if (status !== "authenticated" || !canAccessConversation || socketState === "connected") return
+
+    const interval = window.setInterval(() => {
+      void loadConversation()
+    }, 1000)
+
+    return () => window.clearInterval(interval)
+  }, [status, canAccessConversation, socketState, loadConversation])
+
+  useEffect(() => {
+    if (status !== "authenticated" || !canAccessConversation) return
+
+    const sendPresenceHeartbeat = async () => {
+      try {
+        await fetch("/api/v1/presence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          cache: "no-store",
+          body: JSON.stringify({ state: "online" }),
+        })
+      } catch {
+        return
+      }
+    }
+
+    void sendPresenceHeartbeat()
+    const refreshOnFocus = () => {
+      void sendPresenceHeartbeat()
+      void loadConversation()
+    }
+
+    const heartbeatInterval = window.setInterval(sendPresenceHeartbeat, 3000)
+    window.addEventListener("focus", refreshOnFocus)
+    document.addEventListener("visibilitychange", refreshOnFocus)
+
+    return () => {
+      window.clearInterval(heartbeatInterval)
+      window.removeEventListener("focus", refreshOnFocus)
+      document.removeEventListener("visibilitychange", refreshOnFocus)
+    }
+  }, [status, canAccessConversation, loadConversation])
+
+  const firstMessageDate = useMemo(() => formatDateDivider(messages[0]?.createdAt), [messages])
+  const peer = data?.conversationPeer
+  const peerName = peer?.name || "Conversation"
+  const peerInitials = getInitials(peerName)
+  const peerOnline = Boolean(peer?.isOnline)
+  const backHref = role === "staff" || role === "admin" ? "/dashboard/records" : "/support/view"
+  const canManageInquiry = role === "staff" || role === "admin"
+  const issueClosedStatus =
+    data?.inquiry.status === "resolved" || data?.inquiry.status === "closed"
+      ? data.inquiry.status
+      : null
+  const imageAttachments = useMemo(
+    () => messages.flatMap((message) => message.attachments?.filter((attachment) => attachment.kind === "image") || []),
+    [messages]
+  )
+  const fileAttachments = useMemo(
+    () => messages.flatMap((message) => message.attachments?.filter((attachment) => attachment.kind === "file") || []),
+    [messages]
+  )
+  const conversationLinks = useMemo(() => {
+    const urlRegex = /https?:\/\/[^\s]+/g
+    return messages.flatMap((message) => message.content.match(urlRegex) || [])
+  }, [messages])
+  const searchMatches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return []
+
+    return messages.filter((message) => message.content.toLowerCase().includes(q))
+  }, [messages, searchQuery])
+
+  useEffect(() => {
+    setActiveSearchIndex(0)
+  }, [searchQuery])
+
+  useEffect(() => {
+    if (!searchOpen || searchMatches.length === 0) return
+
+    const active = searchMatches[Math.min(activeSearchIndex, searchMatches.length - 1)]
+    document.getElementById(`message-${active._id}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    })
+  }, [activeSearchIndex, searchMatches, searchOpen])
+
+  const renderHighlightedText = (text: string) => {
+    const q = searchQuery.trim()
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    const renderLinkified = (value: string, keyPrefix: string) =>
+      value.split(urlRegex).map((part, index) =>
+        urlRegex.test(part) ? (
+          <a
+            key={`${keyPrefix}-link-${index}`}
+            href={part}
+            target="_blank"
+            rel="noreferrer"
+            className="underline-offset-2 hover:underline"
+          >
+            {part}
+          </a>
+        ) : (
+          <span key={`${keyPrefix}-text-${index}`}>{part}</span>
+        )
+      )
+
+    if (!q) return renderLinkified(text, "plain")
+
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const parts = text.split(new RegExp(`(${escaped})`, "gi"))
+
+    return parts.map((part, index) =>
+      part.toLowerCase() === q.toLowerCase() ? (
+        <mark key={`${part}-${index}`} className="rounded bg-green-500 px-1 text-white">{part}</mark>
+      ) : (
+        <span key={`${part}-${index}`}>{renderLinkified(part, `part-${index}`)}</span>
+      )
+    )
+  }
+
+  const handleStatusUpdate = async (nextStatus: "resolved" | "closed") => {
+    if (updatingStatus) return
+
+    setUpdatingStatus(nextStatus)
+    try {
+      const res = await fetch("/api/v1/conversations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ inquiryId, status: nextStatus }),
+      })
+      const payload = await res.json()
+
+      if (!res.ok) {
+        throw new Error(payload.error || "Failed to update inquiry")
+      }
+
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              inquiry: {
+                ...current.inquiry,
+                status: nextStatus,
+              },
+            }
+          : current
+      )
+      await loadConversation()
+      toast.success(nextStatus === "resolved" ? "Inquiry marked as resolved" : "Inquiry marked as closed")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update inquiry")
+    } finally {
+      setUpdatingStatus(null)
+    }
+  }
+
+  const handleSend = async () => {
+    const content = draft.trim()
+    if ((!content && attachments.length === 0) || sending) return
+
+    setSending(true)
+    setDraft("")
+    void sendTypingStatus(false)
+    shouldStickToBottomRef.current = true
+    const nextAttachments = attachments
+    setAttachments([])
+    const tempId = `temp-${Date.now()}`
+    const optimisticMessage: Message = {
+      _id: tempId,
+      senderId: (session?.user as any)?.id || "me",
+      senderName: session?.user?.name || (role === "staff" ? "Staff" : "User"),
+      senderRole: role,
+      content,
+      attachments: nextAttachments,
+      createdAt: new Date().toISOString(),
+      pending: true,
+    }
+
+    setMessages((current) => [...current, optimisticMessage])
+
+    try {
+      const res = await fetch("/api/v1/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ inquiryId, content, attachments: nextAttachments }),
+      })
+      const payload = await res.json()
+
+      if (!res.ok) {
+        throw new Error(payload.error || "Failed to send message")
+      }
+
+      setMessages((current) =>
+        current.map((message) => (message._id === tempId ? payload.data : message))
+      )
+      void loadConversation()
+
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        socketRef.current.send(
+          JSON.stringify({
+            type: "conversation.message.create",
+            inquiryId,
+            content,
+          })
+        )
+      }
+    } catch (err) {
+      setDraft(content)
+      setAttachments(nextAttachments)
+      setMessages((current) => current.filter((message) => message._id !== tempId))
+      toast.error(err instanceof Error ? err.message : "Failed to send message")
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const readFileAsDataUrl = (file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(new Error("Failed to read file"))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleAttachmentSelect = async (files: FileList | null, kind: "image" | "file") => {
+    if (!files?.length) return
+
+    const selected = Array.from(files).slice(0, 5 - attachments.length)
+    if (selected.length === 0) {
+      toast.error("You can attach up to 5 files per message")
+      return
+    }
+
+    try {
+      const next = await Promise.all(
+        selected.map(async (file) => {
+          if (file.size > 10 * 1024 * 1024) {
+            throw new Error(`${file.name} is larger than 10MB`)
+          }
+
+          if (kind === "image" && !file.type.startsWith("image/")) {
+            throw new Error(`${file.name} is not an image`)
+          }
+
+          return {
+            kind,
+            name: file.name,
+            type: file.type || "application/octet-stream",
+            size: file.size,
+            url: await readFileAsDataUrl(file),
+          }
+        })
+      )
+
+      setAttachments((current) => [...current, ...next])
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to attach file")
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = ""
+      if (imageInputRef.current) imageInputRef.current.value = ""
+    }
+  }
+
+  const removeAttachment = (name: string) => {
+    setAttachments((current) => current.filter((attachment) => attachment.name !== name))
+  }
+
+  const insertEmoji = (emoji: string) => {
+    const input = textareaRef.current
+    const start = input?.selectionStart ?? draft.length
+    const end = input?.selectionEnd ?? draft.length
+    const nextDraft = `${draft.slice(0, start)}${emoji}${draft.slice(end)}`
+
+    setDraft(nextDraft)
+    setEmojiOpen(false)
+
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+      const nextCursor = start + emoji.length
+      textareaRef.current?.setSelectionRange(nextCursor, nextCursor)
+    })
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault()
+      void handleSend()
+    }
+  }
+
+  const sendTypingStatus = useCallback(
+    async (isTyping: boolean) => {
+      if (typingActiveRef.current === isTyping && isTyping) return
+      typingActiveRef.current = isTyping
+
+      try {
+        await fetch("/api/v1/conversations", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ inquiryId, isTyping }),
+        })
+      } catch {
+        return
+      }
+    },
+    [inquiryId]
+  )
+
+  const handleDraftChange = (value: string) => {
+    setDraft(value)
+
+    if (issueClosedStatus) return
+    void sendTypingStatus(value.trim().length > 0)
+
+    if (typingTimeoutRef.current) {
+      window.clearTimeout(typingTimeoutRef.current)
+    }
+
+    typingTimeoutRef.current = window.setTimeout(() => {
+      void sendTypingStatus(false)
+    }, 2000)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        window.clearTimeout(typingTimeoutRef.current)
+      }
+      if (typingActiveRef.current) {
+        void sendTypingStatus(false)
+      }
+    }
+  }, [sendTypingStatus])
+
+  if (status === "loading" || loading) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header />
+        <main className="flex h-[calc(100vh-4rem)] items-center justify-center text-sm text-slate-500">
+          Loading conversation...
+        </main>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header />
+        <main className="mx-auto flex max-w-2xl flex-col items-center justify-center px-4 py-20 text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+            <Clock3 className="h-6 w-6" />
+          </div>
+          <h1 className="text-2xl font-semibold text-slate-950">Conversation unavailable</h1>
+          <p className="mt-2 text-sm text-slate-500">{error}</p>
+          <Button asChild className="mt-6 cursor-pointer">
+            <Link href={backHref}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Inquiries
+            </Link>
+          </Button>
+        </main>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      <Header hidePrivilegedNav />
+
+      <main className="h-[calc(100vh-4rem)] overflow-hidden">
+        <div className="grid h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="flex min-h-0 flex-col border-r border-slate-200">
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-4 sm:px-6">
+              <div className="flex min-w-0 items-center gap-3">
+                <Button variant="ghost" size="icon" asChild className="mr-1 h-9 w-9 shrink-0 cursor-pointer">
+                  <Link href={backHref} aria-label="Back">
+                    <ArrowLeft className="h-4 w-4" />
+                  </Link>
+                </Button>
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={peer?.profileImage || undefined} alt={peerName} className="object-cover" />
+                  <AvatarFallback className="bg-[#006AEE] font-semibold text-white">{peerInitials}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h1 className="truncate text-sm font-semibold text-slate-950 sm:text-base">{peerName}</h1>
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500">
+                      {data?.inquiry.id}
+                    </span>
+                  </div>
+                  <p className="truncate text-xs text-slate-400">{peer?.statusText || "Conversation participant"}</p>
+                </div>
+              </div>
+
+              {canManageInquiry ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setStatusConfirm("resolved")
+                      setStatusDialogOpen(true)
+                    }}
+                    disabled={updatingStatus !== null || data?.inquiry.status === "resolved" || data?.inquiry.status === "closed"}
+                    className="h-9 cursor-pointer rounded-lg bg-[#006AEE] px-3 text-xs text-white hover:bg-[#0054BB]"
+                  >
+                    <UserCheck className="mr-2 h-4 w-4" />
+                    Mark as Resolved
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setStatusConfirm("closed")
+                      setStatusDialogOpen(true)
+                    }}
+                    disabled={updatingStatus !== null || data?.inquiry.status === "closed"}
+                    className="h-9 cursor-pointer rounded-lg bg-[#006AEE] px-3 text-xs text-white hover:bg-[#0054BB]"
+                  >
+                    <MessageCircleX className="mr-2 h-4 w-4" />
+                    Mark as Closed
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+
+            {searchOpen ? (
+              <div className="flex shrink-0 justify-end border-b border-slate-200 bg-white px-4 py-2 sm:px-6">
+                <div className="flex h-9 w-full max-w-xs items-center gap-2 rounded-md bg-slate-100 px-3 text-sm text-slate-700">
+                  <Search className="h-4 w-4 text-slate-400" />
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search..."
+                    className="min-w-0 flex-1 bg-transparent font-semibold outline-none placeholder:font-normal"
+                    autoFocus
+                  />
+                  <span className="min-w-8 text-right text-xs font-semibold text-slate-500">
+                    {searchQuery.trim() ? `${searchMatches.length ? activeSearchIndex + 1 : 0}/${searchMatches.length}` : "0/0"}
+                  </span>
+                  <span className="h-5 w-px bg-slate-300" />
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded p-1 hover:bg-slate-200"
+                    disabled={searchMatches.length === 0}
+                    onClick={() => setActiveSearchIndex((current) => Math.max(0, current - 1))}
+                    aria-label="Previous search result"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded p-1 hover:bg-slate-200"
+                    disabled={searchMatches.length === 0}
+                    onClick={() => setActiveSearchIndex((current) => Math.min(searchMatches.length - 1, current + 1))}
+                    aria-label="Next search result"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded p-1 hover:bg-slate-200"
+                    onClick={() => {
+                      setSearchOpen(false)
+                      setSearchQuery("")
+                    }}
+                    aria-label="Close search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="relative min-h-0 flex-1">
+            <ScrollArea ref={viewportRef} className="h-full bg-white px-4 py-6 sm:px-8">
+              <div className="flex w-full flex-col gap-3">
+                <div className="py-10 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                  {firstMessageDate}
+                </div>
+
+                {messages.length === 0 ? (
+                  <div className="mx-auto max-w-sm rounded-lg border border-dashed border-slate-200 px-5 py-6 text-center">
+                    <MessageCircle className="mx-auto mb-3 h-8 w-8 text-[#006AEE]" />
+                    <p className="text-sm font-medium text-slate-900">No messages yet</p>
+                    <p className="mt-1 text-xs text-slate-500">Start the conversation for this inquiry.</p>
+                  </div>
+                ) : (
+                  <>
+                    {messages.map((message) => {
+                      const isMine = message.senderId === (session?.user as any)?.id
+
+                      return (
+                        <div
+                          id={`message-${message._id}`}
+                          key={message._id}
+                          className={`flex w-full scroll-mt-20 ${
+                            isMine
+                              ? "justify-end"
+                              : "justify-start pl-11 sm:pl-14 lg:pl-16"
+                          }`}
+                        >
+                          <div
+                            className={`w-fit max-w-[82%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[62%] lg:max-w-[52%] ${
+                              isMine
+                                ? "bg-[#006AEE] text-white"
+                                : "bg-slate-100 text-slate-950"
+                            }`}
+                          >
+                            {message.content ? (
+                              <p className="whitespace-pre-wrap text-sm leading-relaxed">{renderHighlightedText(message.content)}</p>
+                            ) : null}
+                            {message.attachments?.length ? (
+                              <div className="mt-3 space-y-2">
+                                {message.attachments.map((attachment) =>
+                                  attachment.kind === "image" ? (
+                                  <button
+                                    key={`${message._id}-${attachment.name}`}
+                                    type="button"
+                                    onClick={() => setImagePreview(attachment)}
+                                    className="block cursor-pointer overflow-hidden rounded-lg border border-white/20 text-left"
+                                  >
+                                    <img src={attachment.url} alt={attachment.name} className="max-h-56 w-full object-cover" />
+                                  </button>
+                                  ) : (
+                                    <a
+                                      key={`${message._id}-${attachment.name}`}
+                                      href={attachment.url}
+                                      download={attachment.name}
+                                      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs underline-offset-2 hover:underline ${
+                                        isMine ? "bg-white/15 text-white" : "bg-white text-slate-700"
+                                      }`}
+                                    >
+                                      <FileText className="h-4 w-4 shrink-0" />
+                                      <span className="truncate">{attachment.name}</span>
+                                    </a>
+                                  )
+                                )}
+                              </div>
+                            ) : null}
+                            <p className={`mt-2 text-right text-[10px] ${isMine ? "text-blue-100" : "text-slate-400"}`}>
+                              {message.pending ? "Sending..." : formatMessageTime(message.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </>
+                )}
+              </div>
+            </ScrollArea>
+            {peerTyping ? (
+              <div className="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2">
+                <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-4 py-2 text-sm font-medium text-slate-600 shadow-lg backdrop-blur">
+                  <span>{peerName} is typing</span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.3s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
+                  </span>
+                </div>
+              </div>
+            ) : null}
+            </div>
+
+            {issueClosedStatus ? (
+              <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-7 text-center">
+                <p className="text-lg font-semibold text-slate-600">
+                  This issue has been {issueClosedStatus}
+                </p>
+              </div>
+            ) : (
+              <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
+                {attachments.length > 0 ? (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {attachments.map((attachment) => (
+                      <button
+                        key={attachment.name}
+                        type="button"
+                        onClick={() => removeAttachment(attachment.name)}
+                        className="max-w-[220px] cursor-pointer truncate rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 hover:bg-slate-200"
+                        title="Remove attachment"
+                      >
+                        {attachment.kind === "image" ? "Image: " : "File: "}
+                        {attachment.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="flex items-end gap-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    multiple
+                    onChange={(event) => void handleAttachmentSelect(event.target.files, "file")}
+                  />
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    multiple
+                    onChange={(event) => void handleAttachmentSelect(event.target.files, "image")}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-9 w-9 shrink-0 cursor-pointer text-slate-400"
+                  >
+                    <Paperclip className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => imageInputRef.current?.click()}
+                    className="h-9 w-9 shrink-0 cursor-pointer text-slate-400"
+                  >
+                    <Image className="h-5 w-5" />
+                  </Button>
+                  <div className="relative min-w-0 flex-1">
+                    <Textarea
+                      ref={textareaRef}
+                      value={draft}
+                      onChange={(event) => handleDraftChange(event.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type a message ..."
+                      rows={1}
+                      className="max-h-28 min-h-10 resize-none rounded-full border-0 bg-slate-100 px-5 py-2.5 pr-11 text-sm shadow-none focus-visible:ring-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEmojiOpen((open) => !open)}
+                      className="absolute right-3 top-2.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
+                      aria-label="Open emoji picker"
+                    >
+                      <Smile className="h-4 w-4" />
+                    </button>
+                    {emojiOpen ? (
+                      <div className="absolute bottom-12 right-0 z-20 grid w-56 grid-cols-8 gap-1 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+                        {["😀", "😁", "😂", "😊", "😍", "🙂", "🙌", "👍", "🙏", "💙", "✅", "📌", "📄", "🕒", "💬", "🏥", "🤝", "👌", "😅", "✨", "📎", "📝", "🔎", "❤️"].map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => insertEmoji(emoji)}
+                            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded text-base hover:bg-slate-100"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <Button
+                    onClick={handleSend}
+                    disabled={(!draft.trim() && attachments.length === 0) || sending}
+                    size="icon"
+                    className="h-10 w-10 shrink-0 cursor-pointer rounded-full bg-[#006AEE] disabled:cursor-not-allowed"
+                    aria-label="Send message"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <aside className="hidden min-h-0 bg-white lg:flex lg:flex-col">
+            <div className="border-b border-slate-200 px-6 py-10 text-center">
+              <div className="relative mx-auto mb-3 h-28 w-28">
+                <Avatar className="h-28 w-28">
+                  <AvatarImage src={peer?.profileImage || undefined} alt={peerName} className="object-cover" />
+                  <AvatarFallback className="bg-[#006AEE] text-5xl font-semibold text-white">{peerInitials}</AvatarFallback>
+                </Avatar>
+                <span
+                  className={`absolute bottom-2 right-1 h-6 w-6 rounded-full border-4 border-white ${
+                    peerOnline ? "bg-green-500" : "bg-slate-300"
+                  }`}
+                />
+              </div>
+              <h2 className="text-lg font-bold text-slate-950">{peerName}</h2>
+              <p className="text-xs text-slate-400">{peer?.statusText || "Conversation participant"}</p>
+            </div>
+
+            <div className="border-b border-slate-200 px-6 py-4">
+              <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-300">Contact Information</p>
+              <div className="space-y-4">
+                <InfoRow icon={Mail} label="Email Address" value={peer?.email || "Not available"} />
+                <InfoRow icon={Phone} label="Contact Number" value={peer?.contactNumber || "Not available"} />
+              </div>
+            </div>
+
+            <div className="border-b border-slate-200 px-6 py-4">
+              <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-300">Media</p>
+              <div className="space-y-4">
+                <ActionRow icon={FileImage} label="Images" onClick={() => setMediaModal("images")} />
+                <ActionRow icon={FileText} label="Files" onClick={() => setMediaModal("files")} />
+                <ActionRow icon={LinkIcon} label="Links" onClick={() => setMediaModal("links")} />
+              </div>
+            </div>
+
+            <div className="px-6 py-4">
+              <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-300">Actions</p>
+              <div className="space-y-4">
+                <ActionRow icon={Search} label="Search in Conversation" onClick={() => setSearchOpen(true)} />
+              </div>
+            </div>
+          </aside>
+        </div>
+      </main>
+
+      <Dialog open={mediaModal !== null} onOpenChange={(open) => !open && setMediaModal(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {mediaModal === "images" ? "Images" : mediaModal === "files" ? "Files" : "Links"}
+            </DialogTitle>
+            <DialogDescription>
+              {mediaModal === "images"
+                ? "Images shared in this conversation."
+                : mediaModal === "files"
+                  ? "Files shared in this conversation."
+                  : "Links shared in this conversation."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {mediaModal === "images" ? (
+            imageAttachments.length > 0 ? (
+              <div className="grid max-h-[60vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3">
+                {imageAttachments.map((attachment, index) => (
+                  <button
+                    key={`${attachment.name}-${index}`}
+                    type="button"
+                    onClick={() => setImagePreview(attachment)}
+                    className="overflow-hidden rounded-lg border bg-slate-50 text-left"
+                  >
+                    <img src={attachment.url} alt={attachment.name} className="aspect-square w-full object-cover" />
+                    <p className="truncate px-2 py-1 text-xs text-slate-500">{attachment.name}</p>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <EmptyModalState label="No images shared yet." />
+            )
+          ) : null}
+
+          {mediaModal === "files" ? (
+            fileAttachments.length > 0 ? (
+              <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+                {fileAttachments.map((attachment, index) => (
+                  <a
+                    key={`${attachment.name}-${index}`}
+                    href={attachment.url}
+                    download={attachment.name}
+                    className="flex items-center gap-3 rounded-lg border bg-slate-50 px-3 py-2 text-sm hover:bg-slate-100"
+                  >
+                    <FileText className="h-4 w-4 shrink-0 text-[#006AEE]" />
+                    <span className="min-w-0 flex-1 truncate text-slate-800">{attachment.name}</span>
+                    <span className="text-xs text-slate-400">{Math.ceil(attachment.size / 1024)} KB</span>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <EmptyModalState label="No files shared yet." />
+            )
+          ) : null}
+
+          {mediaModal === "links" ? (
+            conversationLinks.length > 0 ? (
+              <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+                {conversationLinks.map((url, index) => (
+                  <a
+                    key={`${url}-${index}`}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-3 rounded-lg border bg-slate-50 px-3 py-2 text-sm hover:bg-slate-100"
+                  >
+                    <LinkIcon className="h-4 w-4 shrink-0 text-[#006AEE]" />
+                    <span className="min-w-0 flex-1 truncate text-slate-800">{url}</span>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <EmptyModalState label="No links shared yet." />
+            )
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={imagePreview !== null} onOpenChange={(open) => !open && setImagePreview(null)}>
+        <DialogContent className="border-0 bg-[#F1FBFF] p-6 shadow-2xl sm:max-w-4xl [&>button]:right-3 [&>button]:top-3 [&>button]:rounded-md [&>button]:border [&>button]:border-[#006AEE] [&>button]:bg-white/80 [&>button]:text-[#006AEE] [&>button]:opacity-100 [&>button]:hover:bg-white">
+          <DialogHeader className="pr-14">
+            <DialogTitle className="text-xl font-bold text-slate-950">{imagePreview?.name || "Image preview"}</DialogTitle>
+            <DialogDescription className="text-sm text-slate-500">Preview shared image.</DialogDescription>
+          </DialogHeader>
+          {imagePreview ? (
+            <Button asChild size="icon" className="absolute right-14 top-6 z-10 h-10 w-10 cursor-pointer rounded-lg bg-[#006AEE] text-white hover:bg-[#0054BB]">
+              <a href={imagePreview.url} download={imagePreview.name} aria-label="Download image">
+                <Download className="h-4 w-4" />
+              </a>
+            </Button>
+          ) : null}
+          {imagePreview ? (
+            <div className="mt-4 flex max-h-[70vh] items-center justify-center overflow-auto rounded-lg bg-white p-4">
+              <img src={imagePreview.url} alt={imagePreview.name} className="max-h-[64vh] w-auto max-w-full object-contain" />
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Mark inquiry as {statusConfirm === "resolved" ? "resolved" : "closed"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will update inquiry {data?.inquiry.id ?? inquiryId} to{" "}
+              {statusConfirm === "resolved" ? "Resolved" : "Closed"}. You can continue to view the conversation after the status changes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer" disabled={updatingStatus !== null}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="cursor-pointer bg-[#006AEE] text-white hover:bg-[#0054BB]"
+              disabled={updatingStatus !== null}
+              onClick={(event) => {
+                event.preventDefault()
+                if (!statusConfirm) return
+                const nextStatus = statusConfirm
+                setStatusDialogOpen(false)
+                void handleStatusUpdate(nextStatus)
+              }}
+            >
+              {updatingStatus ? "Updating..." : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}
+
+function InfoRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  value: string
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#006AEE] text-white">
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-slate-950">{label}</p>
+        <p className="truncate text-[11px] text-slate-400">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+function ActionRow({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  onClick?: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-full cursor-pointer items-center gap-3 rounded-[22px] pr-4 text-left transition-all duration-300 ease-out hover:bg-[#ABE4FD]"
+    >
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[#006AEE] text-white transition-all duration-300 ease-out group-hover:rounded-[20px]">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="text-xs font-semibold text-slate-950 transition-transform duration-300 ease-out group-hover:translate-x-1">
+        {label}
+      </span>
+    </button>
+  )
+}
+
+function EmptyModalState({ label }: { label: string }) {
+  return (
+    <div className="flex min-h-40 items-center justify-center rounded-lg border border-dashed text-sm text-slate-500">
+      {label}
+    </div>
+  )
+}

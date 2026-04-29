@@ -21,7 +21,9 @@ type InquiryCounts = {
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const isAdmin = (session?.user as any)?.role === "admin"
+  const role = (session?.user as any)?.role
+  const isAdmin = role === "admin"
+  const canViewRecords = role === "admin" || role === "staff"
   const [counts, setCounts] = useState<InquiryCounts>({
     total: 0,
     pending: 0,
@@ -38,7 +40,7 @@ export default function DashboardPage() {
   }, [status, session?.user, router])
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (!canViewRecords) return
 
     let isActive = true
     let controller: AbortController | null = null
@@ -90,7 +92,7 @@ export default function DashboardPage() {
       controller?.abort()
       clearInterval(interval)
     }
-  }, [isAdmin])
+  }, [canViewRecords])
 
   if (status === "loading") {
     return (
@@ -159,14 +161,14 @@ export default function DashboardPage() {
                   <p className="text-2xl font-bold">{counts.total}</p>
                 </div>
 
-                {isAdmin ? (
+                {canViewRecords ? (
                   <Button variant="outline" className="shrink-0" asChild>
                     <Link href="/dashboard/records">View Records</Link>
                   </Button>
                 ) : null}
               </div>
 
-              {isAdmin ? (
+              {canViewRecords ? (
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg border bg-muted/30 p-3">
                     <div className="mb-2 flex items-center gap-2">

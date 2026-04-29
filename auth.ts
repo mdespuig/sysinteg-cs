@@ -5,8 +5,21 @@ import Credentials from "next-auth/providers/credentials"
 import clientPromise from "@/lib/db"
 
 const USERS_COLLECTION = "users"
+const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") || process.env.NODE_ENV === "production"
+const sessionCookieName = `${useSecureCookies ? "__Secure-" : ""}next-auth.session-token`
 
 export const authConfig: NextAuthOptions = {
+  cookies: {
+    sessionToken: {
+      name: sessionCookieName,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+  },
   providers: [
     Credentials({
       credentials: {

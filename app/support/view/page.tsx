@@ -22,11 +22,17 @@ import {
   Filter,
   Loader2,
   LogIn,
+  MessageCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   Collapsible,
   CollapsibleContent,
@@ -185,36 +191,55 @@ export default function ViewInquiriesPage() {
   }) => (
     <Card className={`transition-all ${isExpanded ? "ring-2 ring-primary/20" : ""}`}>
       <Collapsible open={isExpanded} onOpenChange={onToggle}>
-        <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer transition-colors hover:bg-muted/50">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <code className="rounded bg-muted px-2 py-0.5 text-sm font-medium text-primary">
-                    {inquiry.id}
-                  </code>
-                  <Badge variant="outline" className={getStatusColor(inquiry.status)}>
-                    {getStatusLabel(inquiry.status)}
-                  </Badge>
-                </div>
-                <CardTitle className="text-lg">
-                  {getInquiryTypeLabel(inquiry.type)}
-                </CardTitle>
-                <CardDescription className="flex items-center gap-2">
-                  <Calendar className="h-3.5 w-3.5" />
-                  {formatDate(inquiry.createdAt)}
-                </CardDescription>
+        <CardHeader className="transition-colors hover:bg-muted/50">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="rounded bg-muted px-2 py-0.5 text-sm font-medium text-primary">
+                  {inquiry.id}
+                </code>
+                <Badge variant="outline" className={getStatusColor(inquiry.status)}>
+                  {getStatusLabel(inquiry.status)}
+                </Badge>
               </div>
-              <Button variant="ghost" size="sm" className="shrink-0 cursor-pointer">
+              <CardTitle className="text-lg">
+                {getInquiryTypeLabel(inquiry.type)}
+              </CardTitle>
+              <CardDescription className="flex items-center gap-2">
+                <Calendar className="h-3.5 w-3.5" />
+                {formatDate(inquiry.createdAt)}
+              </CardDescription>
+            </div>
+            <div className="flex shrink-0 flex-col items-center gap-1">
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="cursor-pointer">
                 {isExpanded ? (
                   <ChevronUp className="h-5 w-5" />
                 ) : (
                   <ChevronDown className="h-5 w-5" />
                 )}
-              </Button>
+                </Button>
+              </CollapsibleTrigger>
+              {inquiry.status !== "pending" && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 cursor-pointer text-[#006AEE] hover:bg-[#006AEE] hover:text-white"
+                      asChild
+                    >
+                      <Link href={`/support/messages/${encodeURIComponent(inquiry.id)}`} aria-label="Access Inquiry messages">
+                        <MessageCircle className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Access Inquiry messages</TooltipContent>
+                </Tooltip>
+              )}
             </div>
-          </CardHeader>
-        </CollapsibleTrigger>
+          </div>
+        </CardHeader>
         <CollapsibleContent>
           <CardContent className="border-t pt-4">
             <div className="grid gap-4 md:grid-cols-2">
