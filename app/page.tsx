@@ -3,18 +3,18 @@
 import Link from "next/link"
 import {
   HeartPulse,
-  Stethoscope,
-  Users,
-  Clock,
   Shield,
   Phone,
   Mail,
   MapPin,
   ArrowRight,
   Activity,
-  Clipboard,
-  UserCheck,
   Building2,
+  BrainCircuit,
+  Boxes,
+  ReceiptText,
+  UserCog,
+  UsersRound,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -48,7 +48,7 @@ export default function LandingPage() {
               </Button>
               <Button size="lg" variant="outline" asChild>
                 <Link href="#services">
-                  Learn More
+                  Main Portal
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -83,81 +83,69 @@ export default function LandingPage() {
       <section id="services" className="scroll-mt-16 border-b">
         <div className="container mx-auto px-4 py-16 md:py-20">
           <div className="mb-12 text-center">
-            <h2 className="mb-4 text-3xl font-bold text-foreground">Our Services</h2>
-            <p className="mx-auto max-w-2xl text-muted-foreground">
-              Comprehensive healthcare services designed to meet all your medical needs under one roof.
+            <h2 className="mb-4 text-3xl font-bold text-foreground">Our Systems</h2>
+            <p className="mx-auto max-w-4xl text-muted-foreground lg:whitespace-nowrap">
+              Comprehensive healthcare subsystems designed to meet all your medical needs under one roof.
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <Card className="transition-shadow hover:shadow-md">
+          <div className="grid gap-6 lg:grid-cols-6">
+            <Card className="transition-shadow hover:shadow-md lg:col-span-2">
               <CardHeader>
                 <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <Stethoscope className="h-6 w-6 text-primary" />
+                  <BrainCircuit className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="text-lg">Primary Care</CardTitle>
+                <CardTitle className="text-lg">Predictive Analysis</CardTitle>
                 <CardDescription>
-                  Comprehensive health check-ups, preventive care, and treatment for common illnesses.
+                  Forecast patient trends, identify risks early, and support data-driven care decisions.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            <Card className="transition-shadow hover:shadow-md">
+            <Card className="transition-shadow hover:shadow-md lg:col-span-2">
               <CardHeader>
                 <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <HeartPulse className="h-6 w-6 text-primary" />
+                  <UsersRound className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="text-lg">Cardiology</CardTitle>
+                <CardTitle className="text-lg">Patient Management</CardTitle>
                 <CardDescription>
-                  Advanced heart care including diagnostics, treatment, and cardiac rehabilitation.
+                  Centralize patient profiles, appointments, and care workflows in one secure system.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            <Card className="transition-shadow hover:shadow-md">
+            <Card className="transition-shadow hover:shadow-md lg:col-span-2">
               <CardHeader>
                 <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <Users className="h-6 w-6 text-primary" />
+                  <Boxes className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="text-lg">Family Medicine</CardTitle>
+                <CardTitle className="text-lg">Inventory & Pharmaceutical</CardTitle>
                 <CardDescription>
-                  Healthcare for the whole family, from pediatrics to geriatric care.
+                  Track stock, medications, and supplies to reduce waste and avoid shortages.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            <Card className="transition-shadow hover:shadow-md">
+            <Card className="transition-shadow hover:shadow-md lg:col-span-3">
               <CardHeader>
                 <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <Clock className="h-6 w-6 text-primary" />
+                  <ReceiptText className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="text-lg">Emergency Services</CardTitle>
+                <CardTitle className="text-lg">Billing & Finance</CardTitle>
                 <CardDescription>
-                  24/7 emergency care with rapid response and life-saving treatments.
+                  Manage invoices, payments, and financial reporting with clarity and control.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            <Card className="transition-shadow hover:shadow-md">
+            <Card className="transition-shadow hover:shadow-md lg:col-span-3">
               <CardHeader>
                 <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <Clipboard className="h-6 w-6 text-primary" />
+                  <UserCog className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="text-lg">Laboratory Services</CardTitle>
+                <CardTitle className="text-lg">Healthcare Staff Management</CardTitle>
                 <CardDescription>
-                  State-of-the-art diagnostic testing and imaging services.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="transition-shadow hover:shadow-md">
-              <CardHeader>
-                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <UserCheck className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-lg">Specialist Consultations</CardTitle>
-                <CardDescription>
-                  Access to expert specialists across various medical fields.
+                  Organize roles, shifts, and team access across departments and facilities.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -214,7 +202,7 @@ export default function LandingPage() {
                     medical records, and more.
                   </p>
                   <Button className="w-full" size="lg" asChild>
-                    <Link href="#contact">
+                    <Link href="/support">
                       Contact Us
                     </Link>
                   </Button>
@@ -280,9 +268,14 @@ export default function LandingPage() {
               </div>
               <span className="font-semibold text-foreground">MediCare Health</span>
             </div>
-            <p className="text-center text-sm text-muted-foreground">
-              2026 MediCare Health System. All rights reserved.
-            </p>
+            <div className="text-center md:text-right">
+              <p className="text-sm text-muted-foreground">
+                2026 MediCare Health System. All rights reserved.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Cobilla, Despuig, Esmabe, Mapa | ITMC321 - ZT32
+              </p>
+            </div>
           </div>
         </div>
       </footer>

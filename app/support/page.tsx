@@ -2,11 +2,8 @@
 
 import Link from "next/link"
 import {
-  HeartPulse,
   FilePlus,
   Search,
-  ArrowRight,
-  ArrowLeft,
   Headphones,
   ClipboardList,
   FileSearch,
@@ -14,6 +11,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Header } from "@/components/header"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
@@ -44,22 +42,7 @@ export default function SupportPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <HeartPulse className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="text-lg font-semibold text-foreground">MediCare Health</span>
-          </Link>
-          <Button variant="ghost" asChild>
-            <Link href="/">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Home
-            </Link>
-          </Button>
-        </div>
-      </header>
+      <Header />
 
       <main className="container mx-auto px-4 py-12 md:py-16">
         <div className="mx-auto max-w-3xl">
@@ -76,7 +59,7 @@ export default function SupportPage() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            <Card className="group relative overflow-hidden transition-all hover:border-primary hover:shadow-lg">
+            <Card className="group relative flex h-full flex-col overflow-hidden transition-all hover:border-primary hover:shadow-lg">
               <div className="absolute right-0 top-0 h-24 w-24 translate-x-6 -translate-y-6 rounded-full bg-primary/10 transition-transform group-hover:scale-150" />
               <CardHeader className="relative">
                 <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 transition-colors group-hover:bg-primary/20">
@@ -87,7 +70,7 @@ export default function SupportPage() {
                   Submit a new inquiry for appointments, billing, medical records, prescriptions, or general concerns.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="relative">
+              <CardContent className="relative flex flex-1 flex-col">
                 <ul className="mb-6 space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <ClipboardList className="h-4 w-4 text-primary" />
@@ -106,16 +89,13 @@ export default function SupportPage() {
                     Prescription refills
                   </li>
                 </ul>
-                <Button className="w-full" size="lg" asChild>
-                  <Link href="/support/request">
-                    Request Inquiry
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
+                <Button className="mt-auto w-full cursor-pointer" size="lg" asChild>
+                  <Link href="/support/request">Request Inquiry</Link>
                 </Button>
               </CardContent>
             </Card>
 
-            <Card className="group relative overflow-hidden transition-all hover:border-accent hover:shadow-lg">
+            <Card className="group relative flex h-full flex-col overflow-hidden transition-all hover:border-accent hover:shadow-lg">
               <div className="absolute right-0 top-0 h-24 w-24 translate-x-6 -translate-y-6 rounded-full bg-accent/10 transition-transform group-hover:scale-150" />
               <CardHeader className="relative">
                 <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-accent/10 transition-colors group-hover:bg-accent/20">
@@ -126,7 +106,7 @@ export default function SupportPage() {
                   Check the status of your existing inquiries or view your inquiry history.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="relative">
+              <CardContent className="relative flex flex-1 flex-col">
                 <ul className="mb-6 space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <FileSearch className="h-4 w-4 text-accent" />
@@ -145,11 +125,8 @@ export default function SupportPage() {
                     See response details
                   </li>
                 </ul>
-                <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" size="lg" asChild>
-                  <Link href="/support/view">
-                    View Inquiries
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
+                <Button className="mt-auto w-full cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90" size="lg" asChild>
+                  <Link href="/support/view">View Inquiries</Link>
                 </Button>
               </CardContent>
             </Card>

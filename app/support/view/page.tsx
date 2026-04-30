@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import {
-  HeartPulse,
   ArrowLeft,
   Search,
   FileText,
@@ -23,11 +22,17 @@ import {
   Filter,
   Loader2,
   LogIn,
+  MessageCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   Collapsible,
   CollapsibleContent,
@@ -40,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Header } from "@/components/header"
 import {
   inquiryTypes,
   getStatusColor,
@@ -68,14 +74,21 @@ export default function ViewInquiriesPage() {
   useEffect(() => {
     if (status !== "authenticated") return
 
+    let isActive = true
+    const controller = new AbortController()
+
     const fetchInquiries = async () => {
       try {
+        if (!isActive) return
         setLoading(true)
         setFetchError("")
 
         const res = await fetch("/api/v1/inquiries", {
           credentials: "include",
+          signal: controller.signal,
         })
+
+        if (!isActive) return
 
         if (!res.ok) {
           if (res.status === 401) {
@@ -99,15 +112,25 @@ export default function ViewInquiriesPage() {
 
         setInquiries(parsed)
       } catch (err) {
+        if ((err as Error).name === "AbortError") return
         console.error("Error fetching inquiries:", err)
-        setFetchError("An unexpected error occurred while fetching your inquiries.")
-        setInquiries([])
+        if (isActive) {
+          setFetchError("An unexpected error occurred while fetching your inquiries.")
+          setInquiries([])
+        }
       } finally {
-        setLoading(false)
+        if (isActive) {
+          setLoading(false)
+        }
       }
     }
 
-    fetchInquiries()
+    void fetchInquiries()
+
+    return () => {
+      isActive = false
+      controller.abort()
+    }
   }, [status])
 
   const handleSearch = () => {
@@ -168,36 +191,55 @@ export default function ViewInquiriesPage() {
   }) => (
     <Card className={`transition-all ${isExpanded ? "ring-2 ring-primary/20" : ""}`}>
       <Collapsible open={isExpanded} onOpenChange={onToggle}>
-        <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer transition-colors hover:bg-muted/50">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <code className="rounded bg-muted px-2 py-0.5 text-sm font-medium text-primary">
-                    {inquiry.id}
-                  </code>
-                  <Badge variant="outline" className={getStatusColor(inquiry.status)}>
-                    {getStatusLabel(inquiry.status)}
-                  </Badge>
-                </div>
-                <CardTitle className="text-lg">
-                  {getInquiryTypeLabel(inquiry.type)}
-                </CardTitle>
-                <CardDescription className="flex items-center gap-2">
-                  <Calendar className="h-3.5 w-3.5" />
-                  {formatDate(inquiry.createdAt)}
-                </CardDescription>
+        <CardHeader className="transition-colors hover:bg-muted/50">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="rounded bg-muted px-2 py-0.5 text-sm font-medium text-primary">
+                  {inquiry.id}
+                </code>
+                <Badge variant="outline" className={getStatusColor(inquiry.status)}>
+                  {getStatusLabel(inquiry.status)}
+                </Badge>
               </div>
-              <Button variant="ghost" size="sm" className="shrink-0">
+              <CardTitle className="text-lg">
+                {getInquiryTypeLabel(inquiry.type)}
+              </CardTitle>
+              <CardDescription className="flex items-center gap-2">
+                <Calendar className="h-3.5 w-3.5" />
+                {formatDate(inquiry.createdAt)}
+              </CardDescription>
+            </div>
+            <div className="flex shrink-0 flex-col items-center gap-1">
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="cursor-pointer">
                 {isExpanded ? (
                   <ChevronUp className="h-5 w-5" />
                 ) : (
                   <ChevronDown className="h-5 w-5" />
                 )}
-              </Button>
+                </Button>
+              </CollapsibleTrigger>
+              {inquiry.status !== "pending" && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 cursor-pointer text-[#006AEE] hover:bg-[#006AEE] hover:text-white"
+                      asChild
+                    >
+                      <Link href={`/support/messages/${encodeURIComponent(inquiry.id)}`} aria-label="Access Inquiry messages">
+                        <MessageCircle className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Access Inquiry messages</TooltipContent>
+                </Tooltip>
+              )}
             </div>
-          </CardHeader>
-        </CollapsibleTrigger>
+          </div>
+        </CardHeader>
         <CollapsibleContent>
           <CardContent className="border-t pt-4">
             <div className="grid gap-4 md:grid-cols-2">
@@ -270,27 +312,19 @@ export default function ViewInquiriesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <HeartPulse className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="text-lg font-semibold text-foreground">
-              MediCare Health
-            </span>
-          </Link>
-          <Button variant="ghost" asChild>
-            <Link href="/support">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Support
-            </Link>
-          </Button>
-        </div>
-      </header>
+      <Header />
 
       <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="mx-auto max-w-3xl">
+          <div className="mb-6 flex justify-start">
+            <Button variant="ghost" asChild className="cursor-pointer px-0">
+              <Link href="/support">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Support
+              </Link>
+            </Button>
+          </div>
+
           <div className="mb-8 text-center">
             <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground md:text-3xl">
               View Inquiries
@@ -314,7 +348,7 @@ export default function ViewInquiriesPage() {
               <CardContent className="py-12 text-center">
                 <AlertCircle className="mx-auto mb-4 h-12 w-12 text-destructive/70" />
                 <p className="mb-2 font-medium text-destructive">{fetchError}</p>
-                <Button className="mt-4" asChild>
+                <Button className="mt-4 cursor-pointer" asChild>
                   <Link href="/auth/login">
                     <LogIn className="mr-2 h-4 w-4" />
                     Sign In
@@ -333,7 +367,7 @@ export default function ViewInquiriesPage() {
                     Search by Inquiry ID
                   </CardTitle>
                   <CardDescription>
-                    Enter your inquiry ID to check its status (e.g., INQ-M5K2X9-AB12)
+                    Enter your inquiry ID to check its status (e.g., INQ-AB12)
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -348,7 +382,7 @@ export default function ViewInquiriesPage() {
                       onKeyDown={handleKeyDown}
                       className="flex-1 uppercase"
                     />
-                    <Button onClick={handleSearch}>
+                    <Button className="cursor-pointer" onClick={handleSearch}>
                       <Search className="mr-2 h-4 w-4" />
                       Search
                     </Button>
@@ -396,7 +430,7 @@ export default function ViewInquiriesPage() {
                     <div className="flex items-center gap-2">
                       <Filter className="h-4 w-4 text-muted-foreground" />
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-36">
+                        <SelectTrigger className="h-9 w-36 rounded-lg border-blue-100 bg-[#D2F1FF] text-slate-700 shadow-none">
                           <SelectValue placeholder="Filter status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -408,7 +442,7 @@ export default function ViewInquiriesPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button variant="outline" size="sm" asChild>
+                    <Button asChild className="cursor-pointer">
                       <Link href="/support/request">
                         <Plus className="mr-1 h-4 w-4" />
                         New
@@ -431,7 +465,7 @@ export default function ViewInquiriesPage() {
                               statusFilter as Inquiry["status"]
                             )}".`}
                       </p>
-                      <Button asChild>
+                      <Button className="cursor-pointer" asChild>
                         <Link href="/support/request">
                           <Plus className="mr-2 h-4 w-4" />
                           Submit New Inquiry
@@ -463,4 +497,3 @@ export default function ViewInquiriesPage() {
     </div>
   )
 }
-
