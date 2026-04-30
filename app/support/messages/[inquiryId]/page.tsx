@@ -22,6 +22,7 @@ import {
   Search,
   Send,
   Smile,
+  Star,
   Trash2,
   UserCheck,
   X,
@@ -98,6 +99,7 @@ type ConversationPayload = {
     contactNumber?: string
     relationship?: string
     details?: string
+    staffRating?: StaffRating | null
   }
   assignedStaff: AssignedStaffInfo
   inquiryUser: AssignedStaffInfo
@@ -106,6 +108,17 @@ type ConversationPayload = {
     isPeerTyping: boolean
   }
   messages: Message[]
+}
+
+type StaffRating = {
+  id?: string
+  staffId?: string | null
+  staffName?: string | null
+  userId?: string | null
+  userName: string
+  rating: number
+  messageDetails?: string
+  createdAt: string
 }
 
 function getInitials(name: string) {
@@ -122,6 +135,19 @@ function formatMessageTime(value: string) {
   if (Number.isNaN(date.getTime())) return ""
 
   return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date)
+}
+
+function formatDateTime(value?: string) {
+  const date = value ? new Date(value) : new Date()
+  if (Number.isNaN(date.getTime())) return "N/A"
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   }).format(date)
@@ -146,12 +172,12 @@ function formatActiveDuration(value?: string) {
 
   const diffMinutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000))
   if (diffMinutes < 1) return "Active now"
-  if (diffMinutes < 60) return `Active ${diffMinutes}m`
+  if (diffMinutes < 60) return `Active ${diffMinutes}m ago`
 
   const diffHours = Math.floor(diffMinutes / 60)
-  if (diffHours < 24) return `Active ${diffHours}h`
+  if (diffHours < 24) return `Active ${diffHours}h ago`
 
-  return `Active ${Math.floor(diffHours / 24)}d`
+  return `Active ${Math.floor(diffHours / 24)}d ago`
 }
 
 export default function InquiryMessagesPage() {
@@ -169,6 +195,10 @@ export default function InquiryMessagesPage() {
   const [updatingStatus, setUpdatingStatus] = useState<"resolved" | "closed" | null>(null)
   const [statusConfirm, setStatusConfirm] = useState<"resolved" | "closed" | null>(null)
   const [statusDialogOpen, setStatusDialogOpen] = useState(false)
+  const [ratingDialogOpen, setRatingDialogOpen] = useState(false)
+  const [ratingValue, setRatingValue] = useState(0)
+  const [ratingMessage, setRatingMessage] = useState("")
+  const [submittingRating, setSubmittingRating] = useState(false)
   const [deleteConversationOpen, setDeleteConversationOpen] = useState(false)
   const [isDeletingConversation, setIsDeletingConversation] = useState(false)
   const [participantInfo, setParticipantInfo] = useState<ParticipantInfoSelection | null>(null)
@@ -377,6 +407,8 @@ export default function InquiryMessagesPage() {
     data?.inquiry.status === "resolved" || data?.inquiry.status === "closed"
       ? data.inquiry.status
       : null
+  const canSubmitStaffRating =
+    role === "standard" && data?.inquiry.status === "resolved" && !data.inquiry.staffRating && Boolean(assignedStaff?.id)
   const imageAttachments = useMemo(
     () => messages.flatMap((message) => message.attachments?.filter((attachment) => attachment.kind === "image") || []),
     [messages]
@@ -399,6 +431,12 @@ export default function InquiryMessagesPage() {
   useEffect(() => {
     setActiveSearchIndex(0)
   }, [searchQuery])
+
+  useEffect(() => {
+    if (canSubmitStaffRating) {
+      setRatingDialogOpen(true)
+    }
+  }, [canSubmitStaffRating])
 
   useEffect(() => {
     if (!searchOpen || searchMatches.length === 0) return
@@ -583,6 +621,57 @@ export default function InquiryMessagesPage() {
     } finally {
       setIsDeletingConversation(false)
       setDeleteConversationOpen(false)
+    }
+  }
+
+  const handleSubmitRating = async () => {
+    if (!ratingValue || submittingRating) return
+
+    setSubmittingRating(true)
+    try {
+      const res = await fetch("/api/v1/ratings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          inquiryId,
+          rating: ratingValue,
+          messageDetails: ratingMessage,
+        }),
+      })
+      const payload = await res.json()
+
+      if (!res.ok) {
+        throw new Error(payload.error || "Failed to submit rating")
+      }
+
+      const createdAt = payload.data?.createdAt || new Date().toISOString()
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              inquiry: {
+                ...current.inquiry,
+                staffRating: {
+                  staffId: assignedStaff?.id || null,
+                  staffName: assignedStaff?.name || "Assigned Staff",
+                  userId: (session?.user as any)?.id || null,
+                  userName: session?.user?.name || session?.user?.email || "Standard User",
+                  rating: ratingValue,
+                  messageDetails: ratingMessage.trim(),
+                  createdAt,
+                },
+              },
+            }
+          : current
+      )
+      setRatingDialogOpen(false)
+      toast.success("Feedback rating submitted")
+      await loadConversation()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit rating")
+    } finally {
+      setSubmittingRating(false)
     }
   }
 
@@ -807,12 +896,15 @@ export default function InquiryMessagesPage() {
   if (isAdminView) {
     return (
       <div className="h-screen overflow-hidden bg-white text-slate-950">
-        <main className="h-full">
+        <Header />
+        <main className="h-[calc(100vh-4rem)]">
           <div className="grid h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
             <section className="flex min-h-0 flex-col border-r border-slate-200">
               <div className="relative flex h-12 shrink-0 items-center border-b border-slate-200 px-3">
-                <Button asChild className="h-8 cursor-pointer rounded-md bg-[#006AEE] px-7 text-xs font-bold text-white hover:bg-[#0054BB]">
-                  <Link href="/dashboard/records">List of Inquiries</Link>
+                <Button asChild size="icon" className="h-8 w-8 cursor-pointer rounded-md bg-transparent text-slate-500 hover:bg-[#006AEE] hover:text-white">
+                  <Link href="/dashboard/records" aria-label="Back to inquiries">
+                    <ArrowLeft className="h-4 w-4" />
+                  </Link>
                 </Button>
                 <h1 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-bold">
                   {data?.inquiry.id || inquiryId}
@@ -941,6 +1033,13 @@ export default function InquiryMessagesPage() {
                   <ActionRow icon={LinkIcon} label="Links" onClick={() => setMediaModal("links")} />
                 </div>
               </div>
+
+              {data?.inquiry.staffRating ? (
+                <div className="border-b border-slate-200 px-6 py-4">
+                  <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-300">Feedback rating</p>
+                  <RatingDetails rating={data.inquiry.staffRating} />
+                </div>
+              ) : null}
 
               <div className="px-6 py-4">
                 <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-300">Actions</p>
@@ -1150,6 +1249,17 @@ export default function InquiryMessagesPage() {
                 <p className="text-lg font-semibold text-slate-600">
                   This issue has been {issueClosedStatus}
                 </p>
+                {role === "standard" && data?.inquiry.status === "resolved" && !data.inquiry.staffRating ? (
+                  <Button
+                    type="button"
+                    onClick={() => setRatingDialogOpen(true)}
+                    className="mt-3 h-9 cursor-pointer rounded-lg bg-[#006AEE] px-4 text-xs text-white hover:bg-[#0054BB]"
+                  >
+                    Rate Staff
+                  </Button>
+                ) : role === "standard" && data?.inquiry.staffRating ? (
+                  <p className="mt-2 text-sm text-slate-500">Feedback submitted. Thank you.</p>
+                ) : null}
               </div>
             ) : (
               <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
@@ -1160,7 +1270,7 @@ export default function InquiryMessagesPage() {
                         key={attachment.name}
                         type="button"
                         onClick={() => removeAttachment(attachment.name)}
-                        className="max-w-[220px] cursor-pointer truncate rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 hover:bg-slate-200"
+                        className="max-w-55 cursor-pointer truncate rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 hover:bg-slate-200"
                         title="Remove attachment"
                       >
                         {attachment.kind === "image" ? "Image: " : "File: "}
@@ -1258,6 +1368,7 @@ export default function InquiryMessagesPage() {
                 label="Participant"
                 avatarClassName="mx-auto mb-3 h-28 w-28"
                 showName={false}
+                centered={role === "standard" || role === "staff"}
                 onOpenInfo={setParticipantInfo}
               />
               <HoverCard>
@@ -1313,8 +1424,78 @@ export default function InquiryMessagesPage() {
       />
       <ParticipantInfoDialog selection={participantInfo} onOpenChange={setParticipantInfo} />
 
+      <Dialog open={ratingDialogOpen && role === "standard" && data?.inquiry.status === "resolved" && !data.inquiry.staffRating} onOpenChange={setRatingDialogOpen}>
+        <DialogContent className="sm:max-w-md [&>button]:cursor-pointer">
+          <DialogHeader>
+            <DialogTitle>Rate Staff Support</DialogTitle>
+            <DialogDescription>
+              Share your feedback for {assignedStaff?.name || "the assigned staff"} on inquiry {data?.inquiry.id ?? inquiryId}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-slate-500">Username</p>
+                  <p className="font-medium text-slate-950">{session?.user?.name || session?.user?.email || "Standard User"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Timestamp</p>
+                  <p className="font-medium text-slate-950">{formatDateTime(new Date().toISOString())}</p>
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-950">Rating</p>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setRatingValue(value)}
+                    className="cursor-pointer rounded-md p-1 text-amber-400 hover:bg-[#006AEE] hover:text-white"
+                    aria-label={`Rate ${value} star${value === 1 ? "" : "s"}`}
+                  >
+                    <Star className={`h-8 w-8 ${value <= ratingValue ? "fill-amber-400" : "fill-none"}`} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-950">Message details</p>
+              <Textarea
+                value={ratingMessage}
+                onChange={(event) => setRatingMessage(event.target.value)}
+                placeholder="Add feedback about the support you received..."
+                rows={4}
+                className="resize-none bg-white"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              disabled={submittingRating}
+              onClick={() => setRatingDialogOpen(false)}
+            >
+              Later
+            </Button>
+            <Button
+              type="button"
+              className="cursor-pointer bg-[#006AEE] text-white hover:bg-[#0054BB]"
+              disabled={ratingValue === 0 || submittingRating}
+              onClick={() => void handleSubmitRating()}
+            >
+              {submittingRating ? "Submitting..." : "Submit Rating"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="[&>button]:cursor-pointer">
           <AlertDialogHeader>
             <AlertDialogTitle>
               Mark inquiry as {statusConfirm === "resolved" ? "resolved" : "closed"}?
@@ -1399,6 +1580,35 @@ function EmptyModalState({ label }: { label: string }) {
   return (
     <div className="flex min-h-40 items-center justify-center rounded-lg border border-dashed text-sm text-slate-500">
       {label}
+    </div>
+  )
+}
+
+function RatingDetails({ rating }: { rating: StaffRating }) {
+  return (
+    <div className="rounded-lg border bg-slate-50 p-3 text-left">
+      <div className="mb-3 flex items-center gap-1 text-amber-400">
+        {[1, 2, 3, 4, 5].map((value) => (
+          <Star
+            key={value}
+            className={`h-4 w-4 ${value <= rating.rating ? "fill-amber-400" : "fill-none text-slate-300"}`}
+          />
+        ))}
+      </div>
+      <div className="space-y-2 text-xs">
+        <div>
+          <p className="text-slate-400">Rated by</p>
+          <p className="font-semibold text-slate-950">{rating.userName || "Standard User"}</p>
+        </div>
+        <div>
+          <p className="text-slate-400">Timestamp</p>
+          <p className="font-semibold text-slate-950">{formatDateTime(rating.createdAt)}</p>
+        </div>
+        <div>
+          <p className="text-slate-400">Message details</p>
+          <p className="whitespace-pre-wrap text-slate-700">{rating.messageDetails || "No message details provided."}</p>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1535,6 +1745,7 @@ function ParticipantHoverCard({
   label,
   avatarClassName,
   showName = true,
+  centered = false,
   onOpenInfo,
 }: {
   participant?: AssignedStaffInfo | null
@@ -1542,6 +1753,7 @@ function ParticipantHoverCard({
   label: string
   avatarClassName?: string
   showName?: boolean
+  centered?: boolean
   onOpenInfo?: (selection: ParticipantInfoSelection) => void
 }) {
   const name = participant?.name || label
@@ -1551,7 +1763,7 @@ function ParticipantHoverCard({
       <HoverCardTrigger asChild>
         <button
           type="button"
-          className="flex max-w-[118px] cursor-pointer flex-col items-center text-center outline-none"
+          className={`flex max-w-29.5 cursor-pointer flex-col items-center text-center outline-none focus-visible:ring-2 focus-visible:ring-[#006AEE] focus-visible:ring-offset-2 ${centered ? "mx-auto" : ""}`}
           aria-label={`View ${label.toLowerCase()} information`}
           onClick={() => onOpenInfo?.({ participant, fallbackColor, label })}
         >

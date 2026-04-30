@@ -6,6 +6,7 @@ import clientPromise from "@/lib/db"
 
 const CONVERSATIONS_COLLECTION = "conversations"
 const MESSAGES_COLLECTION = "conversationMessages"
+const STAFF_RATINGS_COLLECTION = "staffRatings"
 
 async function requireRecordsAccess() {
   const session = await getServerSession(authConfig)
@@ -42,6 +43,8 @@ export async function getAdminInquiries() {
     const client = await clientPromise
     const db = client.db("healthcare")
     const inquiries = await db.collection("inquiries").find({}).sort({ createdAt: -1 }).toArray()
+    const role = (session.user as any).role
+    const currentUserId = (session.user as any).id as string
 
     const userIds = Array.from(
       new Set(
@@ -63,18 +66,65 @@ export async function getAdminInquiries() {
       : []
 
     const userMap = new Map(users.map((user) => [user._id.toString(), user]))
+    const inquiryIds = inquiries.map((inquiry) => inquiry.id).filter(Boolean)
+    const ratings = inquiryIds.length
+      ? await db
+          .collection(STAFF_RATINGS_COLLECTION)
+          .find({ inquiryId: { $in: inquiryIds } })
+          .toArray()
+      : []
+    const ratingMap = new Map(ratings.map((rating) => [rating.inquiryId, rating]))
+    const staffRatingSummary =
+      role === "staff"
+        ? await db
+            .collection(STAFF_RATINGS_COLLECTION)
+            .aggregate([
+              { $match: { staffId: currentUserId } },
+              {
+                $group: {
+                  _id: "$staffId",
+                  totalRatings: { $sum: 1 },
+                  averageRating: { $avg: "$rating" },
+                },
+              },
+            ])
+            .next()
+        : null
 
     const data = inquiries.map((inquiry) => {
       const linkedUser = typeof inquiry.userId === "string" ? userMap.get(inquiry.userId) : null
+      const rating = ratingMap.get(inquiry.id)
 
       return {
         ...inquiry,
         userLabel: linkedUser?.username || linkedUser?.email || inquiry.email || "Unknown User",
+        staffRating: rating
+          ? {
+              id: rating._id.toString(),
+              staffId: rating.staffId,
+              staffName: rating.staffName,
+              userId: rating.userId,
+              userName: rating.userName,
+              rating: rating.rating,
+              messageDetails: rating.messageDetails,
+              createdAt: rating.createdAt,
+            }
+          : inquiry.staffRating || null,
       }
     })
 
     return NextResponse.json(
-      { success: true, count: data.length, data },
+      {
+        success: true,
+        count: data.length,
+        data,
+        staffRatingSummary: staffRatingSummary
+          ? {
+              totalRatings: staffRatingSummary.totalRatings || 0,
+              averageRating: staffRatingSummary.averageRating || 0,
+            }
+          : null,
+      },
       { status: 200 }
     )
   } catch (error) {

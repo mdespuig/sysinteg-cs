@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useSession, signOut } from "next-auth/react"
 import { HeartPulse, LogOut, User } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -22,9 +23,11 @@ type HeaderProps = {
 
 export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: HeaderProps) {
   const { data: session } = useSession()
+  const pathname = usePathname()
   const role = (session?.user as any)?.role
   const isPrivilegedUser = role === "admin" || role === "staff"
   const isAdmin = role === "admin"
+  const showDashboardLink = pathname === "/"
   const [profileImage, setProfileImage] = useState<string | null>(null)
 
   const handleLogout = async () => {
@@ -137,27 +140,29 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
           <span className="text-lg font-semibold text-foreground">MediCare Health</span>
         </Link>
 
-        <nav className="hidden items-center justify-center gap-8 lg:gap-10 md:flex justify-self-center">
+        <nav className="hidden grid-flow-col auto-cols-[8.75rem] items-center justify-center gap-2 md:grid justify-self-center">
           {isPrivilegedUser && !hidePrivilegedNav ? (
             <>
-              <Link href="/dashboard" className="whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-                Dashboard
-              </Link>
+              {showDashboardLink ? (
+                <Link href="/dashboard" className="flex h-9 items-center justify-center whitespace-nowrap rounded-md text-center text-sm font-medium text-muted-foreground transition-colors hover:bg-[#006AEE]/10 hover:text-foreground">
+                  Dashboard
+                </Link>
+              ) : null}
               {isAdmin && showRecordsNav ? (
-                <Link href="/dashboard/records" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                <Link href="/dashboard/records" className="flex h-9 items-center justify-center whitespace-nowrap rounded-md text-center text-sm font-medium text-muted-foreground transition-colors hover:bg-[#006AEE]/10 hover:text-foreground">
                   Medical Records
                 </Link>
               ) : null}
             </>
           ) : !isPrivilegedUser ? (
             <>
-              <Link href="/support" className="whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+              <Link href="/support" className="flex h-9 items-center justify-center whitespace-nowrap rounded-md text-center text-sm font-medium text-muted-foreground transition-colors hover:bg-[#006AEE]/10 hover:text-foreground">
                 Contact Support
               </Link>
-              <Link href="/#about" className="whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+              <Link href="/#about" className="flex h-9 items-center justify-center whitespace-nowrap rounded-md text-center text-sm font-medium text-muted-foreground transition-colors hover:bg-[#006AEE]/10 hover:text-foreground">
                 About Us
               </Link>
-              <Link href="/#services" className="whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+              <Link href="/#services" className="flex h-9 items-center justify-center whitespace-nowrap rounded-md text-center text-sm font-medium text-muted-foreground transition-colors hover:bg-[#006AEE]/10 hover:text-foreground">
                 Other Systems
               </Link>
             </>

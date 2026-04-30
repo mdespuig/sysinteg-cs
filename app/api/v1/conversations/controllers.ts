@@ -13,6 +13,7 @@ const USERS_COLLECTION = "users"
 const PRESENCE_COLLECTION = "presence"
 const TYPING_COLLECTION = "conversationTyping"
 const PROFILE_COLLECTION = "profile"
+const STAFF_RATINGS_COLLECTION = "staffRatings"
 
 async function requireConversationUser() {
   const session = await getServerSession(authConfig)
@@ -239,6 +240,7 @@ export async function getConversation(request: NextRequest) {
 
     const assignedStaff = await resolveAssignedStaff(db, inquiry)
     const inquiryUser = await resolveInquiryUser(db, inquiry)
+    const staffRating = await db.collection(STAFF_RATINGS_COLLECTION).findOne({ inquiryId: inquiry.id })
     const conversationPeer = auth.role === "staff" || auth.role === "admin" ? inquiryUser : assignedStaff
     const peerTyping = conversationPeer.id
       ? await db.collection(TYPING_COLLECTION).findOne({
@@ -269,6 +271,18 @@ export async function getConversation(request: NextRequest) {
             contactNumber: inquiry.contactNumber,
             relationship: inquiry.relationship,
             details: inquiry.details,
+            staffRating: staffRating
+              ? {
+                  id: staffRating._id.toString(),
+                  staffId: staffRating.staffId,
+                  staffName: staffRating.staffName,
+                  userId: staffRating.userId,
+                  userName: staffRating.userName,
+                  rating: staffRating.rating,
+                  messageDetails: staffRating.messageDetails,
+                  createdAt: staffRating.createdAt,
+                }
+              : null,
           },
           assignedStaff,
           inquiryUser,

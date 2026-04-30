@@ -4,6 +4,8 @@ import clientPromise from "@/lib/db"
 import { generateInquiryId, type InquiryType } from "@/lib/inquiry-data"
 import { authConfig } from "@/auth"
 
+const STAFF_RATINGS_COLLECTION = "staffRatings"
+
 export async function createInquiry(request: NextRequest) {
   try {
     const body = await request.json()
@@ -97,8 +99,26 @@ export async function listOrGetInquiry(request: NextRequest) {
           { status: 404 }
         )
       }
+      const rating = await db.collection(STAFF_RATINGS_COLLECTION).findOne({ inquiryId: inquiry.id })
       return NextResponse.json(
-        { success: true, data: inquiry },
+        {
+          success: true,
+          data: {
+            ...inquiry,
+            staffRating: rating
+              ? {
+                  id: rating._id.toString(),
+                  staffId: rating.staffId,
+                  staffName: rating.staffName,
+                  userId: rating.userId,
+                  userName: rating.userName,
+                  rating: rating.rating,
+                  messageDetails: rating.messageDetails,
+                  createdAt: rating.createdAt,
+                }
+              : inquiry.staffRating || null,
+          },
+        },
         { status: 200 }
       )
     }
@@ -116,12 +136,39 @@ export async function listOrGetInquiry(request: NextRequest) {
       .find({ userId: (session?.user as any)?.id! })
       .sort({ createdAt: -1 })
       .toArray()
+    const inquiryIds = inquiries.map((inquiry) => inquiry.id).filter(Boolean)
+    const ratings = inquiryIds.length
+      ? await db
+          .collection(STAFF_RATINGS_COLLECTION)
+          .find({ inquiryId: { $in: inquiryIds }, userId: (session?.user as any)?.id! })
+          .toArray()
+      : []
+    const ratingMap = new Map(ratings.map((rating) => [rating.inquiryId, rating]))
+    const data = inquiries.map((inquiry) => {
+      const rating = ratingMap.get(inquiry.id)
+
+      return {
+        ...inquiry,
+        staffRating: rating
+          ? {
+              id: rating._id.toString(),
+              staffId: rating.staffId,
+              staffName: rating.staffName,
+              userId: rating.userId,
+              userName: rating.userName,
+              rating: rating.rating,
+              messageDetails: rating.messageDetails,
+              createdAt: rating.createdAt,
+            }
+          : inquiry.staffRating || null,
+      }
+    })
 
     return NextResponse.json(
       {
         success: true,
         count: inquiries.length,
-        data: inquiries,
+        data,
       },
       { status: 200 }
     )

@@ -26,7 +26,7 @@ export default function LandingPage() {
       <Header />
 
       <section className="relative overflow-hidden border-b">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
+        <div aria-hidden="true" className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-accent/5" />
         <div className="container relative mx-auto px-4 py-20 md:py-28">
           <div className="mx-auto max-w-3xl text-center">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-card px-4 py-1.5">

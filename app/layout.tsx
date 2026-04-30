@@ -5,7 +5,7 @@ import { AuthProvider } from '@/components/auth-provider'
 import '../styles/globals.css'
 
 export const metadata: Metadata = {
-  title: 'MediCare Health - Healthcare System',
+  title: 'MediCare - Customer Support System',
   description: 'Comprehensive healthcare services with authentication, inquiry management, and patient care',
   generator: 'v0.app',
   icons: {

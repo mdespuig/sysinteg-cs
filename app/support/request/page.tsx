@@ -301,10 +301,10 @@ export default function RequestInquiryPage() {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="h-screen overflow-hidden bg-background">
         <Header />
 
-        <main className="container mx-auto px-4 py-12 md:py-20">
+        <main className="container mx-auto flex h-[calc(100vh-4rem)] items-center px-4 py-4">
           <Card className="mx-auto max-w-lg border-2 border-online/30">
             <CardContent className="pt-8 pb-8 text-center">
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-online/10">
@@ -355,12 +355,13 @@ export default function RequestInquiryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen overflow-hidden bg-background">
       <Header />
 
-      <main className="container mx-auto px-4 py-8 md:py-12">
-        <div className="mx-auto max-w-2xl">
-          <div className="mb-6 flex justify-start">
+      <main className="container mx-auto flex h-[calc(100vh-4rem)] flex-col overflow-hidden px-4 py-4">
+        <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
+          <div className="shrink-0 bg-background pb-4">
+          <div className="mb-3 flex justify-start">
             <Button variant="ghost" asChild className="px-0">
               <Link href="/support">
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -369,7 +370,7 @@ export default function RequestInquiryPage() {
             </Button>
           </div>
 
-          <div className="mb-8 text-center">
+          <div className="text-center">
             <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground md:text-3xl">
               Submit an Inquiry
             </h1>
@@ -377,15 +378,16 @@ export default function RequestInquiryPage() {
               Fill out the form below and our team will get back to you within 24-48 hours.
             </p>
           </div>
+          </div>
 
-          <Card>
-            <CardHeader>
+          <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <CardHeader className="shrink-0">
               <CardTitle className="flex items-center gap-2">
                 <Clipboard className="h-5 w-5 text-primary" />
                 Inquiry Form
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="min-h-0 flex-1 overflow-y-auto pr-3">
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="inquiry-type" className="flex items-center gap-1">

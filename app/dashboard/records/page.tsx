@@ -16,6 +16,7 @@ import {
   PlayCircle,
   RefreshCw,
   Search,
+  Star,
   Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -52,12 +53,25 @@ type SortableInquiry = Inquiry & {
   assignedStaff?: string
   assignedStaffId?: string | null
   resolvedBy?: string | null
+  staffRating?: StaffRating | null
+}
+
+type StaffRating = {
+  id?: string
+  staffId?: string | null
+  staffName?: string | null
+  userId?: string | null
+  userName: string
+  rating: number
+  messageDetails?: string
+  createdAt: string
 }
 
 export default function RecordsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [items, setItems] = useState<SortableInquiry[]>([])
+  const [staffRatingSummary, setStaffRatingSummary] = useState({ totalRatings: 0, averageRating: 0 })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [pageSize, setPageSize] = useState("5")
@@ -130,6 +144,10 @@ export default function RecordsPage() {
           userLabel: item.userLabel || item.email || "Unknown User",
           assignedStaff: item.assignedStaff || "Unassigned",
         })))
+        setStaffRatingSummary({
+          totalRatings: data.staffRatingSummary?.totalRatings || 0,
+          averageRating: data.staffRatingSummary?.averageRating || 0,
+        })
       }
     } catch (error) {
       if ((error as Error).name === "AbortError") return
@@ -214,6 +232,8 @@ export default function RecordsPage() {
         available: 0,
         unresolved: 0,
         resolved: 0,
+        totalRatings: 0,
+        averageRating: 0,
       }
     }
 
@@ -221,8 +241,10 @@ export default function RecordsPage() {
       available: items.filter((item) => item.status === "pending").length,
       unresolved: staffCurrentInquiry ? 1 : 0,
       resolved: items.filter((item) => item.assignedStaffId === staffId && item.status === "resolved").length,
+      totalRatings: staffRatingSummary.totalRatings,
+      averageRating: staffRatingSummary.averageRating,
     }
-  }, [items, staffCurrentInquiry, staffId])
+  }, [items, staffCurrentInquiry, staffId, staffRatingSummary])
   const summary = useMemo(() => {
     return items.reduce(
       (acc, item) => {
@@ -359,11 +381,11 @@ export default function RecordsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen overflow-hidden bg-background">
       <Header />
-      <div className="mx-auto max-w-7xl px-4">
+      <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-7xl flex-col overflow-hidden px-4">
 
-        <div className="mt-6 mb-6 flex items-center justify-between">
+        <div className="mb-6 mt-6 flex shrink-0 items-center justify-between">
           <Button variant="ghost" asChild className="cursor-pointer">
             <Link href="/dashboard">
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -371,10 +393,10 @@ export default function RecordsPage() {
             </Link>
           </Button>
           <h1 className="flex-1 text-center text-3xl font-bold">List of Inquiries</h1>
-          <div className="w-[84px]" />
+          <span aria-hidden="true" className="w-21" />
         </div>
 
-        <div className={isStaff ? "grid gap-4 lg:grid-cols-[252px_minmax(0,1fr)_130px]" : "grid gap-4 lg:grid-cols-[minmax(0,1fr)_130px]"}>
+        <div className={isStaff ? "grid min-h-0 flex-1 items-start gap-4 lg:grid-cols-[252px_minmax(0,1fr)_130px]" : "grid min-h-0 flex-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_130px]"}>
         {isStaff ? (
           <aside className="h-fit rounded-3xl border border-blue-100 bg-white p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.08),0_12px_30px_rgba(59,130,246,0.08)]">
             <div className="mb-5">
@@ -414,6 +436,22 @@ export default function RecordsPage() {
                 </div>
                 <p className="text-2xl font-semibold">{staffStats.resolved}</p>
                 <p className="mt-1 text-[11px] text-slate-500">Resolved by you</p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  <p className="text-xs text-muted-foreground">Staff Ratings</p>
+                </div>
+                <div className="flex items-end justify-between gap-2">
+                  <div>
+                    <p className="text-2xl font-semibold">{staffStats.totalRatings}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">Total ratings</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-semibold">{staffStats.averageRating.toFixed(1)}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">Average</p>
+                  </div>
+                </div>
               </div>
             </div>
           </aside>
@@ -626,9 +664,8 @@ export default function RecordsPage() {
 
         <aside className="h-fit rounded-3xl border border-slate-200 bg-white px-2.5 py-4 shadow-sm">
           <div className="mb-4">
-            <h2 className="text-center text-xs font-semibold uppercase leading-tight tracking-[0.1em] text-slate-500">
-              <span className="block">Record</span>
-              <span className="block">Summary</span>
+            <h2 className="text-center text-xs font-semibold uppercase leading-tight tracking-widest text-slate-500">
+              Record Summary
             </h2>
           </div>
 
@@ -682,7 +719,7 @@ export default function RecordsPage() {
           }
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="[&>button]:cursor-pointer">
           <AlertDialogHeader>
             <AlertDialogTitle>
               Delete {deleteTargetIds.length === 1 ? "inquiry" : "inquiries"}?
@@ -720,7 +757,7 @@ export default function RecordsPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl [&>button]:cursor-pointer">
           <DialogHeader>
             <DialogTitle>Inquiry Details</DialogTitle>
             <DialogDescription>
@@ -780,6 +817,47 @@ export default function RecordsPage() {
                   <p className="text-sm font-medium text-foreground">{formatDateTime(selectedInquiry.updatedAt)}</p>
                 </div>
               </div>
+
+              {selectedInquiry.staffRating ? (
+                <div className="rounded-lg border bg-amber-50/50 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Rated by</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {selectedInquiry.staffRating.userName || "Standard User"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 text-amber-400">
+                      {[1, 2, 3, 4, 5].map((value) => (
+                        <Star
+                          key={value}
+                          className={`h-4 w-4 ${value <= selectedInquiry.staffRating!.rating ? "fill-amber-400" : "fill-none text-slate-300"}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Timestamp</p>
+                      <p className="text-sm font-medium text-foreground">{formatDateTime(selectedInquiry.staffRating.createdAt)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Rating</p>
+                      <p className="text-sm font-medium text-foreground">{selectedInquiry.staffRating.rating} / 5</p>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <p className="text-xs text-muted-foreground">Message Details</p>
+                      <p className="whitespace-pre-wrap text-sm text-foreground">
+                        {selectedInquiry.staffRating.messageDetails || "No message details provided."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : selectedInquiry.status === "resolved" || selectedInquiry.status === "closed" ? (
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <p className="text-sm text-muted-foreground">No staff rating has been submitted for this inquiry.</p>
+                </div>
+              ) : null}
 
               <div className="rounded-lg border bg-muted/30 p-4">
                 <p className="mb-1 text-xs text-muted-foreground">Details</p>

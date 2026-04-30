@@ -504,7 +504,7 @@ export default function ProfilePage() {
   const avatarSrc = useDefaultAvatarPreview ? defaultAvatarSrc : profileData.profileImage
 
   if (status === "loading") {
-    return <div className="flex min-h-screen items-center justify-center bg-background">Loading...</div>
+    return <div className="flex h-screen items-center justify-center overflow-hidden bg-background">Loading...</div>
   }
 
   if (status === "unauthenticated") {
@@ -512,17 +512,17 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen overflow-hidden bg-background">
       <Header />
 
-      <main className="container mx-auto px-4 py-8 md:py-12">
-        <div className="mx-auto max-w-3xl">
-          <div className="mb-8 text-center">
+      <main className="container mx-auto flex h-[calc(100vh-4rem)] flex-col overflow-hidden px-4 py-4">
+        <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
+          <div className="shrink-0 bg-background pb-4 text-center">
             <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground md:text-3xl">My Profile</h1>
             <p className="text-muted-foreground">Manage your personal information and emergency contact details.</p>
           </div>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="min-h-0 flex-1 overflow-y-auto pr-2 pb-4">
             <Card className="mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -748,27 +748,10 @@ export default function ProfilePage() {
             {isAdmin && (
               <Card className="mt-6">
                 <CardContent className="pt-6">
-                  <div className="flex items-center justify-between gap-4 rounded-lg border bg-muted/30 p-4">
+                  <div className="rounded-lg border bg-muted/30 p-4">
                     <p className="text-sm text-muted-foreground">
                       Admins can only modify their avatar icon.
                     </p>
-                    <Button
-                      type="submit"
-                      className="cursor-pointer hover:bg-[#006AEE] hover:text-white"
-                      disabled={isSaving}
-                    >
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="mr-2 h-4 w-4" />
-                          Save Changes
-                        </>
-                      )}
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
