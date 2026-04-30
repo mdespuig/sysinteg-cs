@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { createConversationMessage, getConversation, updateConversationInquiryStatus, updateTypingStatus } from "./controllers"
+import { createConversationMessage, deleteConversation, getConversation, updateConversationInquiryStatus, updateTypingStatus } from "./controllers"
 
 export async function GET(request: NextRequest) {
   return getConversation(request)
@@ -15,4 +15,8 @@ export async function PATCH(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   return updateTypingStatus(request)
+}
+
+export async function DELETE(request: NextRequest) {
+  return deleteConversation(request)
 }

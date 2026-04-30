@@ -292,10 +292,6 @@ export default function RecordsPage() {
     setDetailsDialogOpen(true)
   }
 
-  const handleSeeMessagesPlaceholder = () => {
-    toast("See Messages is coming soon.")
-  }
-
   const handleAssignInquiry = async (inquiryId: string) => {
     if (assigningInquiryId) return
 
@@ -830,12 +826,15 @@ export default function RecordsPage() {
                       : "Messages unavailable"}
                 </Button>
               )
+            ) : selectedInquiry ? (
+              <Button type="button" className="cursor-pointer" asChild>
+                <Link href={`/support/messages/${encodeURIComponent(selectedInquiry.id)}`}>
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  See Messages
+                </Link>
+              </Button>
             ) : (
-              <Button
-                type="button"
-                className="cursor-pointer"
-                onClick={handleSeeMessagesPlaceholder}
-              >
+              <Button type="button" disabled>
                 See Messages
               </Button>
             )}

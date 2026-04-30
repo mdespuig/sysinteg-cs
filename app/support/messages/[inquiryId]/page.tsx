@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { redirect, useParams } from "next/navigation"
+import { redirect, useParams, useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import {
   ArrowLeft,
@@ -22,6 +22,7 @@ import {
   Search,
   Send,
   Smile,
+  Trash2,
   UserCheck,
   X,
 } from "lucide-react"
@@ -46,6 +47,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Header } from "@/components/header"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import type { AssignedStaffInfo } from "@/lib/conversation-data"
@@ -70,6 +72,15 @@ type MessageAttachment = {
 }
 
 type MediaModal = "images" | "files" | "links" | null
+
+type ParticipantInfoSelection = {
+  participant?: AssignedStaffInfo | null
+  fallbackColor: string
+  label: string
+}
+
+type ParticipantInfoSide = "top" | "right" | "bottom" | "left"
+type ParticipantInfoAlign = "start" | "center" | "end"
 
 type ConversationPayload = {
   conversation: {
@@ -129,9 +140,24 @@ function formatDateDivider(value?: string) {
     .toUpperCase()
 }
 
+function formatActiveDuration(value?: string) {
+  const date = value ? new Date(value) : null
+  if (!date || Number.isNaN(date.getTime())) return "No activity yet"
+
+  const diffMinutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000))
+  if (diffMinutes < 1) return "Active now"
+  if (diffMinutes < 60) return `Active ${diffMinutes}m`
+
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `Active ${diffHours}h`
+
+  return `Active ${Math.floor(diffHours / 24)}d`
+}
+
 export default function InquiryMessagesPage() {
   const params = useParams<{ inquiryId: string }>()
   const inquiryId = decodeURIComponent(params.inquiryId || "").toUpperCase()
+  const router = useRouter()
   const { data: session, status } = useSession()
   const [data, setData] = useState<ConversationPayload | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -143,6 +169,9 @@ export default function InquiryMessagesPage() {
   const [updatingStatus, setUpdatingStatus] = useState<"resolved" | "closed" | null>(null)
   const [statusConfirm, setStatusConfirm] = useState<"resolved" | "closed" | null>(null)
   const [statusDialogOpen, setStatusDialogOpen] = useState(false)
+  const [deleteConversationOpen, setDeleteConversationOpen] = useState(false)
+  const [isDeletingConversation, setIsDeletingConversation] = useState(false)
+  const [participantInfo, setParticipantInfo] = useState<ParticipantInfoSelection | null>(null)
   const [mediaModal, setMediaModal] = useState<MediaModal>(null)
   const [imagePreview, setImagePreview] = useState<MessageAttachment | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -335,10 +364,15 @@ export default function InquiryMessagesPage() {
   const firstMessageDate = useMemo(() => formatDateDivider(messages[0]?.createdAt), [messages])
   const peer = data?.conversationPeer
   const peerName = peer?.name || "Conversation"
-  const peerInitials = getInitials(peerName)
-  const peerOnline = Boolean(peer?.isOnline)
+  const inquiryUser = data?.inquiryUser
+  const assignedStaff = data?.assignedStaff
+  const isAdminView = role === "admin"
+  const lastActivityLabel = useMemo(
+    () => formatActiveDuration(messages[messages.length - 1]?.createdAt),
+    [messages]
+  )
   const backHref = role === "staff" || role === "admin" ? "/dashboard/records" : "/support/view"
-  const canManageInquiry = role === "staff" || role === "admin"
+  const canManageInquiry = role === "staff"
   const issueClosedStatus =
     data?.inquiry.status === "resolved" || data?.inquiry.status === "closed"
       ? data.inquiry.status
@@ -410,6 +444,84 @@ export default function InquiryMessagesPage() {
     )
   }
 
+  const getAdminMessageParticipant = (message: Message) => {
+    if (message.senderId && inquiryUser?.id === message.senderId) {
+      return { participant: inquiryUser, fallbackColor: "#006AEE" }
+    }
+
+    if (message.senderId && assignedStaff?.id === message.senderId) {
+      return { participant: assignedStaff, fallbackColor: "#F5B400" }
+    }
+
+    if (message.senderRole === "standard" && inquiryUser) {
+      return { participant: inquiryUser, fallbackColor: "#006AEE" }
+    }
+
+    if (message.senderRole === "staff" && assignedStaff) {
+      return { participant: assignedStaff, fallbackColor: "#F5B400" }
+    }
+
+    return {
+      participant: {
+        id: message.senderId,
+        name: message.senderName || "Conversation participant",
+        profileImage: null,
+        statusText: "Offline",
+        isOnline: false,
+        lastSeenAt: null,
+      } satisfies AssignedStaffInfo,
+      fallbackColor: "#64748B",
+    }
+  }
+
+  const searchControls = searchOpen ? (
+    <div className="flex shrink-0 justify-end border-b border-slate-200 bg-white px-4 py-2 sm:px-6">
+      <div className="flex h-9 w-full max-w-xs items-center gap-2 rounded-md bg-slate-100 px-3 text-sm text-slate-700">
+        <Search className="h-4 w-4 text-slate-400" />
+        <input
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search..."
+          className="min-w-0 flex-1 bg-transparent font-semibold outline-none placeholder:font-normal"
+          autoFocus
+        />
+        <span className="min-w-8 text-right text-xs font-semibold text-slate-500">
+          {searchQuery.trim() ? `${searchMatches.length ? activeSearchIndex + 1 : 0}/${searchMatches.length}` : "0/0"}
+        </span>
+        <span className="h-5 w-px bg-slate-300" />
+        <button
+          type="button"
+          className="cursor-pointer rounded p-1 hover:bg-slate-200"
+          disabled={searchMatches.length === 0}
+          onClick={() => setActiveSearchIndex((current) => Math.max(0, current - 1))}
+          aria-label="Previous search result"
+        >
+          <ChevronUp className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          className="cursor-pointer rounded p-1 hover:bg-slate-200"
+          disabled={searchMatches.length === 0}
+          onClick={() => setActiveSearchIndex((current) => Math.min(searchMatches.length - 1, current + 1))}
+          aria-label="Next search result"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          className="cursor-pointer rounded p-1 hover:bg-slate-200"
+          onClick={() => {
+            setSearchOpen(false)
+            setSearchQuery("")
+          }}
+          aria-label="Close search"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  ) : null
+
   const handleStatusUpdate = async (nextStatus: "resolved" | "closed") => {
     if (updatingStatus) return
 
@@ -447,7 +559,39 @@ export default function InquiryMessagesPage() {
     }
   }
 
+  const handleDeleteConversation = async () => {
+    if (role !== "admin" || isDeletingConversation) return
+
+    setIsDeletingConversation(true)
+    try {
+      const res = await fetch("/api/v1/conversations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ inquiryId }),
+      })
+      const payload = await res.json()
+
+      if (!res.ok) {
+        throw new Error(payload.error || "Failed to delete conversation")
+      }
+
+      toast.success("Conversation deleted")
+      router.replace("/dashboard/records")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete conversation")
+    } finally {
+      setIsDeletingConversation(false)
+      setDeleteConversationOpen(false)
+    }
+  }
+
   const handleSend = async () => {
+    if (role === "admin") {
+      toast.error("Admins can only view conversation history")
+      return
+    }
+
     const content = draft.trim()
     if ((!content && attachments.length === 0) || sending) return
 
@@ -660,6 +804,195 @@ export default function InquiryMessagesPage() {
     )
   }
 
+  if (isAdminView) {
+    return (
+      <div className="h-screen overflow-hidden bg-white text-slate-950">
+        <main className="h-full">
+          <div className="grid h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <section className="flex min-h-0 flex-col border-r border-slate-200">
+              <div className="relative flex h-12 shrink-0 items-center border-b border-slate-200 px-3">
+                <Button asChild className="h-8 cursor-pointer rounded-md bg-[#006AEE] px-7 text-xs font-bold text-white hover:bg-[#0054BB]">
+                  <Link href="/dashboard/records">List of Inquiries</Link>
+                </Button>
+                <h1 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-bold">
+                  {data?.inquiry.id || inquiryId}
+                </h1>
+              </div>
+
+              {searchControls}
+
+              <ScrollArea ref={viewportRef} className="min-h-0 flex-1 bg-white px-5 py-7">
+                <div className="flex min-h-full flex-col justify-end gap-4">
+                  <div className="pb-6 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                    {firstMessageDate}
+                  </div>
+
+                  {messages.length === 0 ? (
+                    <div className="mx-auto mb-20 max-w-sm rounded-lg border border-dashed border-slate-200 px-5 py-6 text-center">
+                      <MessageCircle className="mx-auto mb-3 h-8 w-8 text-[#006AEE]" />
+                      <p className="text-sm font-medium text-slate-900">No conversation history yet</p>
+                      <p className="mt-1 text-xs text-slate-500">Messages will appear here once staff and user communicate.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 pb-4">
+                      {messages.map((message) => {
+                        const { participant, fallbackColor } = getAdminMessageParticipant(message)
+                        const participantLabel =
+                          message.senderRole === "standard"
+                            ? "User"
+                            : message.senderRole === "staff"
+                              ? "Staff"
+                              : "Admin"
+
+                        return (
+                          <div
+                            id={`message-${message._id}`}
+                            key={message._id}
+                            className="flex w-full scroll-mt-20 items-start gap-3"
+                          >
+                            <ParticipantAvatar participant={participant} fallbackColor={fallbackColor} size="small" />
+                            <div className="min-w-0 max-w-5xl">
+                              <div className="mb-0.5 flex flex-wrap items-center gap-3">
+                                <ParticipantNameAction
+                                  name={message.senderName || participant.name}
+                                  participant={participant}
+                                  fallbackColor={fallbackColor}
+                                  label={participantLabel}
+                                  side="right"
+                                  onOpenInfo={setParticipantInfo}
+                                />
+                                <p className="text-[10px] font-medium text-slate-300">
+                                  {message.pending ? "Sending..." : formatMessageTime(message.createdAt)}
+                                </p>
+                              </div>
+                              {message.content ? (
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-950">
+                                  {renderHighlightedText(message.content)}
+                                </p>
+                              ) : null}
+                              {message.attachments?.length ? (
+                                <div className="mt-2 flex max-w-xl flex-wrap gap-2">
+                                  {message.attachments.map((attachment) =>
+                                    attachment.kind === "image" ? (
+                                      <button
+                                        key={`${message._id}-${attachment.name}`}
+                                        type="button"
+                                        onClick={() => setImagePreview(attachment)}
+                                        className="cursor-pointer overflow-hidden rounded-lg border border-slate-200 bg-white text-left"
+                                      >
+                                        <img src={attachment.url} alt={attachment.name} className="h-28 w-36 object-cover" />
+                                      </button>
+                                    ) : (
+                                      <a
+                                        key={`${message._id}-${attachment.name}`}
+                                        href={attachment.url}
+                                        download={attachment.name}
+                                        className="flex max-w-xs items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 underline-offset-2 hover:underline"
+                                      >
+                                        <FileText className="h-4 w-4 shrink-0 text-[#006AEE]" />
+                                        <span className="truncate">{attachment.name}</span>
+                                      </a>
+                                    )
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+
+              <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4">
+                <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-center sm:gap-20">
+                  <ParticipantByline
+                    label="Inquiry created by:"
+                    participant={inquiryUser}
+                    fallbackColor="#006AEE"
+                    onOpenInfo={setParticipantInfo}
+                  />
+                  <ParticipantByline
+                    label="Inquiry responded by:"
+                    participant={assignedStaff}
+                    fallbackColor="#F5B400"
+                    onOpenInfo={setParticipantInfo}
+                  />
+                </div>
+              </div>
+            </section>
+
+            <aside className="hidden min-h-0 bg-white lg:flex lg:flex-col">
+              <div className="border-b border-slate-200 px-6 py-10 text-center">
+                <div className="mb-3 flex items-start justify-center gap-5">
+                  <ParticipantHoverCard participant={inquiryUser} fallbackColor="#006AEE" label="User" onOpenInfo={setParticipantInfo} />
+                  <ParticipantHoverCard participant={assignedStaff} fallbackColor="#F5B400" label="Staff" onOpenInfo={setParticipantInfo} />
+                </div>
+                <h2 className="text-lg font-bold text-slate-950">{data?.inquiry.id}</h2>
+                <p className="text-xs text-slate-400">{lastActivityLabel}</p>
+              </div>
+
+              <div className="border-b border-slate-200 px-6 py-4">
+                <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-300">Media</p>
+                <div className="space-y-4">
+                  <ActionRow icon={FileImage} label="Images" onClick={() => setMediaModal("images")} />
+                  <ActionRow icon={FileText} label="Files" onClick={() => setMediaModal("files")} />
+                  <ActionRow icon={LinkIcon} label="Links" onClick={() => setMediaModal("links")} />
+                </div>
+              </div>
+
+              <div className="px-6 py-4">
+                <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-300">Actions</p>
+                <div className="space-y-4">
+                  <ActionRow icon={Search} label="Search in Conversation" onClick={() => setSearchOpen(true)} />
+                  <ActionRow icon={Trash2} label="Delete Conversation" onClick={() => setDeleteConversationOpen(true)} />
+                </div>
+              </div>
+            </aside>
+          </div>
+        </main>
+
+        <ConversationMediaDialogs
+          mediaModal={mediaModal}
+          setMediaModal={setMediaModal}
+          imageAttachments={imageAttachments}
+          fileAttachments={fileAttachments}
+          conversationLinks={conversationLinks}
+          imagePreview={imagePreview}
+          setImagePreview={setImagePreview}
+        />
+        <ParticipantInfoDialog selection={participantInfo} onOpenChange={setParticipantInfo} />
+
+        <AlertDialog open={deleteConversationOpen} onOpenChange={setDeleteConversationOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the message history for inquiry {data?.inquiry.id ?? inquiryId}. The inquiry record will remain.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="cursor-pointer" disabled={isDeletingConversation}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="cursor-pointer bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={isDeletingConversation}
+                onClick={(event) => {
+                  event.preventDefault()
+                  void handleDeleteConversation()
+                }}
+              >
+                {isDeletingConversation ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <Header hidePrivilegedNav />
@@ -676,7 +1009,7 @@ export default function InquiryMessagesPage() {
                 </Button>
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={peer?.profileImage || undefined} alt={peerName} className="object-cover" />
-                  <AvatarFallback className="bg-[#006AEE] font-semibold text-white">{peerInitials}</AvatarFallback>
+                  <AvatarFallback className="bg-[#006AEE] font-semibold text-white">{getInitials(peerName)}</AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -719,53 +1052,7 @@ export default function InquiryMessagesPage() {
               ) : null}
             </div>
 
-            {searchOpen ? (
-              <div className="flex shrink-0 justify-end border-b border-slate-200 bg-white px-4 py-2 sm:px-6">
-                <div className="flex h-9 w-full max-w-xs items-center gap-2 rounded-md bg-slate-100 px-3 text-sm text-slate-700">
-                  <Search className="h-4 w-4 text-slate-400" />
-                  <input
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search..."
-                    className="min-w-0 flex-1 bg-transparent font-semibold outline-none placeholder:font-normal"
-                    autoFocus
-                  />
-                  <span className="min-w-8 text-right text-xs font-semibold text-slate-500">
-                    {searchQuery.trim() ? `${searchMatches.length ? activeSearchIndex + 1 : 0}/${searchMatches.length}` : "0/0"}
-                  </span>
-                  <span className="h-5 w-px bg-slate-300" />
-                  <button
-                    type="button"
-                    className="cursor-pointer rounded p-1 hover:bg-slate-200"
-                    disabled={searchMatches.length === 0}
-                    onClick={() => setActiveSearchIndex((current) => Math.max(0, current - 1))}
-                    aria-label="Previous search result"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className="cursor-pointer rounded p-1 hover:bg-slate-200"
-                    disabled={searchMatches.length === 0}
-                    onClick={() => setActiveSearchIndex((current) => Math.min(searchMatches.length - 1, current + 1))}
-                    aria-label="Next search result"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className="cursor-pointer rounded p-1 hover:bg-slate-200"
-                    onClick={() => {
-                      setSearchOpen(false)
-                      setSearchQuery("")
-                    }}
-                    aria-label="Close search"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ) : null}
+            {searchControls}
 
             <div className="relative min-h-0 flex-1">
             <ScrollArea ref={viewportRef} className="h-full bg-white px-4 py-6 sm:px-8">
@@ -965,18 +1252,26 @@ export default function InquiryMessagesPage() {
 
           <aside className="hidden min-h-0 bg-white lg:flex lg:flex-col">
             <div className="border-b border-slate-200 px-6 py-10 text-center">
-              <div className="relative mx-auto mb-3 h-28 w-28">
-                <Avatar className="h-28 w-28">
-                  <AvatarImage src={peer?.profileImage || undefined} alt={peerName} className="object-cover" />
-                  <AvatarFallback className="bg-[#006AEE] text-5xl font-semibold text-white">{peerInitials}</AvatarFallback>
-                </Avatar>
-                <span
-                  className={`absolute bottom-2 right-1 h-6 w-6 rounded-full border-4 border-white ${
-                    peerOnline ? "bg-green-500" : "bg-slate-300"
-                  }`}
-                />
-              </div>
-              <h2 className="text-lg font-bold text-slate-950">{peerName}</h2>
+              <ParticipantHoverCard
+                participant={peer}
+                fallbackColor="#006AEE"
+                label="Participant"
+                avatarClassName="mx-auto mb-3 h-28 w-28"
+                showName={false}
+                onOpenInfo={setParticipantInfo}
+              />
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <button
+                    type="button"
+                    className="cursor-pointer text-lg font-bold text-slate-950 underline-offset-4 hover:underline"
+                    onClick={() => setParticipantInfo({ participant: peer, fallbackColor: "#006AEE", label: "Participant" })}
+                  >
+                    {peerName}
+                  </button>
+                </HoverCardTrigger>
+                <ParticipantInfoCard participant={peer} fallbackColor="#006AEE" />
+              </HoverCard>
               <p className="text-xs text-slate-400">{peer?.statusText || "Conversation participant"}</p>
             </div>
 
@@ -1007,6 +1302,126 @@ export default function InquiryMessagesPage() {
         </div>
       </main>
 
+      <ConversationMediaDialogs
+        mediaModal={mediaModal}
+        setMediaModal={setMediaModal}
+        imageAttachments={imageAttachments}
+        fileAttachments={fileAttachments}
+        conversationLinks={conversationLinks}
+        imagePreview={imagePreview}
+        setImagePreview={setImagePreview}
+      />
+      <ParticipantInfoDialog selection={participantInfo} onOpenChange={setParticipantInfo} />
+
+      <AlertDialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Mark inquiry as {statusConfirm === "resolved" ? "resolved" : "closed"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will update inquiry {data?.inquiry.id ?? inquiryId} to{" "}
+              {statusConfirm === "resolved" ? "Resolved" : "Closed"}. You can continue to view the conversation after the status changes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer" disabled={updatingStatus !== null}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="cursor-pointer bg-[#006AEE] text-white hover:bg-[#0054BB]"
+              disabled={updatingStatus !== null}
+              onClick={(event) => {
+                event.preventDefault()
+                if (!statusConfirm) return
+                const nextStatus = statusConfirm
+                setStatusDialogOpen(false)
+                void handleStatusUpdate(nextStatus)
+              }}
+            >
+              {updatingStatus ? "Updating..." : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}
+
+function InfoRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  value: string
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#006AEE] text-white">
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-slate-950">{label}</p>
+        <p className="truncate text-[11px] text-slate-400">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+function ActionRow({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  onClick?: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-full cursor-pointer items-center gap-3 rounded-[22px] pr-4 text-left transition-all duration-300 ease-out hover:bg-[#ABE4FD]"
+    >
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[#006AEE] text-white transition-all duration-300 ease-out group-hover:rounded-[20px]">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="text-xs font-semibold text-slate-950 transition-transform duration-300 ease-out group-hover:translate-x-1">
+        {label}
+      </span>
+    </button>
+  )
+}
+
+function EmptyModalState({ label }: { label: string }) {
+  return (
+    <div className="flex min-h-40 items-center justify-center rounded-lg border border-dashed text-sm text-slate-500">
+      {label}
+    </div>
+  )
+}
+
+function ConversationMediaDialogs({
+  mediaModal,
+  setMediaModal,
+  imageAttachments,
+  fileAttachments,
+  conversationLinks,
+  imagePreview,
+  setImagePreview,
+}: {
+  mediaModal: MediaModal
+  setMediaModal: (value: MediaModal) => void
+  imageAttachments: MessageAttachment[]
+  fileAttachments: MessageAttachment[]
+  conversationLinks: string[]
+  imagePreview: MessageAttachment | null
+  setImagePreview: (value: MessageAttachment | null) => void
+}) {
+  return (
+    <>
       <Dialog open={mediaModal !== null} onOpenChange={(open) => !open && setMediaModal(null)}>
         <DialogContent className="sm:max-w-2xl [&>button]:cursor-pointer">
           <DialogHeader>
@@ -1110,93 +1525,231 @@ export default function InquiryMessagesPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+    </>
+  )
+}
 
-      <AlertDialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Mark inquiry as {statusConfirm === "resolved" ? "resolved" : "closed"}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This will update inquiry {data?.inquiry.id ?? inquiryId} to{" "}
-              {statusConfirm === "resolved" ? "Resolved" : "Closed"}. You can continue to view the conversation after the status changes.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="cursor-pointer" disabled={updatingStatus !== null}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="cursor-pointer bg-[#006AEE] text-white hover:bg-[#0054BB]"
-              disabled={updatingStatus !== null}
-              onClick={(event) => {
-                event.preventDefault()
-                if (!statusConfirm) return
-                const nextStatus = statusConfirm
-                setStatusDialogOpen(false)
-                void handleStatusUpdate(nextStatus)
-              }}
-            >
-              {updatingStatus ? "Updating..." : "Confirm"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+function ParticipantHoverCard({
+  participant,
+  fallbackColor,
+  label,
+  avatarClassName,
+  showName = true,
+  onOpenInfo,
+}: {
+  participant?: AssignedStaffInfo | null
+  fallbackColor: string
+  label: string
+  avatarClassName?: string
+  showName?: boolean
+  onOpenInfo?: (selection: ParticipantInfoSelection) => void
+}) {
+  const name = participant?.name || label
+
+  return (
+    <HoverCard openDelay={150} closeDelay={100}>
+      <HoverCardTrigger asChild>
+        <button
+          type="button"
+          className="flex max-w-[118px] cursor-pointer flex-col items-center text-center outline-none"
+          aria-label={`View ${label.toLowerCase()} information`}
+          onClick={() => onOpenInfo?.({ participant, fallbackColor, label })}
+        >
+          <ParticipantAvatar
+            participant={participant}
+            fallbackColor={fallbackColor}
+            avatarClassName={avatarClassName}
+          />
+          {showName ? (
+            <>
+              <span className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-300">{label}</span>
+              <span className="mt-0.5 max-w-full truncate text-xs font-bold text-slate-950 underline-offset-4 hover:underline">
+                {name}
+              </span>
+            </>
+          ) : null}
+        </button>
+      </HoverCardTrigger>
+      <ParticipantInfoCard participant={participant} fallbackColor={fallbackColor} />
+    </HoverCard>
+  )
+}
+
+function ParticipantByline({
+  label,
+  participant,
+  fallbackColor,
+  onOpenInfo,
+}: {
+  label: string
+  participant?: AssignedStaffInfo | null
+  fallbackColor: string
+  onOpenInfo: (selection: ParticipantInfoSelection) => void
+}) {
+  const name = participant?.name || "Not assigned"
+
+  return (
+    <div className="flex min-w-0 items-center justify-center gap-2">
+      <span className="shrink-0 text-xs font-semibold text-slate-500 sm:text-sm">{label}</span>
+      <ParticipantNameAction
+        name={name}
+        participant={participant}
+        fallbackColor={fallbackColor}
+        label={label}
+        side="top"
+        align="center"
+        className="min-w-0 cursor-pointer truncate text-xs font-bold text-slate-950 underline-offset-4 hover:underline sm:text-sm"
+        onOpenInfo={onOpenInfo}
+      />
     </div>
   )
 }
 
-function InfoRow({
-  icon: Icon,
+function ParticipantNameAction({
+  name,
+  participant,
+  fallbackColor,
   label,
-  value,
+  side = "left",
+  align = "start",
+  className = "cursor-pointer text-sm font-bold text-slate-950 underline-offset-4 hover:underline",
+  onOpenInfo,
 }: {
-  icon: React.ComponentType<{ className?: string }>
+  name: string
+  participant?: AssignedStaffInfo | null
+  fallbackColor: string
   label: string
-  value: string
+  side?: ParticipantInfoSide
+  align?: ParticipantInfoAlign
+  className?: string
+  onOpenInfo: (selection: ParticipantInfoSelection) => void
 }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#006AEE] text-white">
-        <Icon className="h-4 w-4" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs font-semibold text-slate-950">{label}</p>
-        <p className="truncate text-[11px] text-slate-400">{value}</p>
-      </div>
-    </div>
+    <HoverCard openDelay={150} closeDelay={100}>
+      <HoverCardTrigger asChild>
+        <button
+          type="button"
+          className={className}
+          onClick={() => onOpenInfo({ participant, fallbackColor, label })}
+        >
+          {name}
+        </button>
+      </HoverCardTrigger>
+      <ParticipantInfoCard
+        participant={participant}
+        fallbackColor={fallbackColor}
+        side={side}
+        align={align}
+      />
+    </HoverCard>
   )
 }
 
-function ActionRow({
-  icon: Icon,
-  label,
-  onClick,
+function ParticipantInfoDialog({
+  selection,
+  onOpenChange,
 }: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  onClick?: () => void
+  selection: ParticipantInfoSelection | null
+  onOpenChange: (selection: ParticipantInfoSelection | null) => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex w-full cursor-pointer items-center gap-3 rounded-[22px] pr-4 text-left transition-all duration-300 ease-out hover:bg-[#ABE4FD]"
-    >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[#006AEE] text-white transition-all duration-300 ease-out group-hover:rounded-[20px]">
-        <Icon className="h-4 w-4" />
-      </span>
-      <span className="text-xs font-semibold text-slate-950 transition-transform duration-300 ease-out group-hover:translate-x-1">
-        {label}
-      </span>
-    </button>
+    <Dialog open={selection !== null} onOpenChange={(open) => !open && onOpenChange(null)}>
+      <DialogContent className="sm:max-w-sm [&>button]:cursor-pointer">
+        <DialogHeader>
+          <DialogTitle>User Information</DialogTitle>
+        </DialogHeader>
+        {selection ? (
+          <ParticipantInfoPanel
+            participant={selection.participant}
+            fallbackColor={selection.fallbackColor}
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
   )
 }
 
-function EmptyModalState({ label }: { label: string }) {
+function ParticipantInfoCard({
+  participant,
+  fallbackColor,
+  side = "left",
+  align = "start",
+}: {
+  participant?: AssignedStaffInfo | null
+  fallbackColor: string
+  side?: ParticipantInfoSide
+  align?: ParticipantInfoAlign
+}) {
   return (
-    <div className="flex min-h-40 items-center justify-center rounded-lg border border-dashed text-sm text-slate-500">
-      {label}
+    <HoverCardContent side={side} align={align} sideOffset={10} className="w-72 p-4">
+      <ParticipantInfoPanel participant={participant} fallbackColor={fallbackColor} />
+    </HoverCardContent>
+  )
+}
+
+function ParticipantInfoPanel({
+  participant,
+  fallbackColor,
+}: {
+  participant?: AssignedStaffInfo | null
+  fallbackColor: string
+}) {
+  const name = participant?.name || "Participant"
+
+  return (
+    <>
+      <div className="flex items-start gap-3">
+        <ParticipantAvatar participant={participant} fallbackColor={fallbackColor} size="small" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-slate-950">{name}</p>
+          <p className="text-xs text-slate-500">{participant?.statusText || "Offline"}</p>
+        </div>
+      </div>
+      <div className="mt-4 space-y-3">
+        <InfoRow icon={Mail} label="Email Address" value={participant?.email || "Not available"} />
+        <InfoRow icon={Phone} label="Contact Number" value={participant?.contactNumber || "Not available"} />
+      </div>
+    </>
+  )
+}
+
+function ParticipantAvatar({
+  participant,
+  fallbackColor,
+  size = "large",
+  avatarClassName,
+  fallbackText,
+}: {
+  participant?: AssignedStaffInfo | null
+  fallbackColor: string
+  size?: "small" | "large"
+  avatarClassName?: string
+  fallbackText?: string
+}) {
+  const name = participant?.name || "Participant"
+  const avatarSize = size === "large" ? "h-[70px] w-[70px]" : "h-9 w-9"
+  const fallbackTextSize = size === "large" ? "text-3xl" : "text-sm"
+  const dotSize = size === "large" ? "h-5 w-5 border-4" : "h-3 w-3 border-2"
+  const avatarFallbackText =
+    fallbackText ||
+    (participant?.name === "Unassigned Staff" ? "?" : getInitials(name))
+
+  return (
+    <div className="relative inline-flex">
+      <Avatar className={avatarClassName || avatarSize}>
+        <AvatarImage src={participant?.profileImage || undefined} alt={name} className="object-cover" />
+        <AvatarFallback
+          className={`${fallbackTextSize} font-bold text-white`}
+          style={{ backgroundColor: fallbackColor }}
+        >
+          {avatarFallbackText}
+        </AvatarFallback>
+      </Avatar>
+      <span
+        className={`absolute bottom-1 right-0 rounded-full border-white ${
+          participant?.isOnline ? "bg-green-500" : "bg-slate-300"
+        } ${dotSize}`}
+      />
     </div>
   )
 }

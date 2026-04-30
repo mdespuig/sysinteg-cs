@@ -339,6 +339,13 @@ export async function createConversationMessage(request: NextRequest) {
     const auth = await requireConversationUser()
     if (auth.error) return auth.error
 
+    if (auth.role === "admin") {
+      return NextResponse.json(
+        { error: "Admins can only view conversation history" },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const inquiryId = normalizeInquiryId(body.inquiryId)
     const content = typeof body.content === "string" ? body.content.trim() : ""
@@ -418,6 +425,49 @@ export async function createConversationMessage(request: NextRequest) {
   } catch (error) {
     console.error("Error creating conversation message:", error)
     return NextResponse.json({ error: "Failed to send message" }, { status: 500 })
+  }
+}
+
+export async function deleteConversation(request: NextRequest) {
+  try {
+    const auth = await requireConversationUser()
+    if (auth.error) return auth.error
+
+    if (auth.role !== "admin") {
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 }
+      )
+    }
+
+    const body = await request.json()
+    const inquiryId = normalizeInquiryId(body.inquiryId)
+
+    if (!inquiryId) {
+      return NextResponse.json({ error: "Inquiry ID is required" }, { status: 400 })
+    }
+
+    const client = await clientPromise
+    const db = client.db(DATABASE_NAME)
+    const conversation = await db.collection(CONVERSATIONS_COLLECTION).findOne({ inquiryId })
+
+    if (!conversation) {
+      return NextResponse.json({ error: "Conversation not found" }, { status: 404 })
+    }
+
+    await Promise.all([
+      db.collection(MESSAGES_COLLECTION).deleteMany({ conversationId: conversation._id.toString() }),
+      db.collection(TYPING_COLLECTION).deleteMany({ inquiryId }),
+      db.collection(CONVERSATIONS_COLLECTION).deleteOne({ _id: conversation._id }),
+    ])
+
+    return NextResponse.json(
+      { success: true, message: "Conversation deleted successfully" },
+      { status: 200 }
+    )
+  } catch (error) {
+    console.error("Error deleting conversation:", error)
+    return NextResponse.json({ error: "Failed to delete conversation" }, { status: 500 })
   }
 }
 
