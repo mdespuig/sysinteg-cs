@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server"
-import { claimStaffInquiry, deleteAdminInquiry, getAdminInquiries } from "./controllers"
+import { deleteAdminInquiry, getAdminInquiries, updateStaffInquiry } from "./controllers"
 
-export async function GET() {
-  return getAdminInquiries()
+export async function GET(request: NextRequest) {
+  return getAdminInquiries(request)
 }
 
 export async function DELETE(request: NextRequest) {
@@ -10,5 +10,5 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  return claimStaffInquiry(request)
+  return updateStaffInquiry(request)
 }

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import clientPromise from "@/lib/db"
 import { generateInquiryId, type InquiryType } from "@/lib/inquiry-data"
 import { authConfig } from "@/auth"
+import { createNotification, createNotificationsForRole } from "@/lib/notifications"
 
 const STAFF_RATINGS_COLLECTION = "staffRatings"
 
@@ -64,6 +65,16 @@ export async function createInquiry(request: NextRequest) {
     }
 
     await inquiriesCollection.insertOne(inquiry)
+    await createNotificationsForRole(db, ["admin", "staff"], {
+      type: "inquiry-created",
+      title: "New inquiry received",
+      message: `Inquiry ${inquiry.id} is waiting for review.`,
+      href: "/dashboard/records",
+      inquiryId: inquiry.id,
+      actorId: userId,
+      actorName: patientName.trim(),
+      dedupeKey: `inquiry-created:${inquiry.id}`,
+    })
 
     return NextResponse.json(
       {
@@ -105,6 +116,7 @@ export async function listOrGetInquiry(request: NextRequest) {
           success: true,
           data: {
             ...inquiry,
+            _id: inquiry._id?.toString(),
             staffRating: rating
               ? {
                   id: rating._id.toString(),
@@ -149,6 +161,7 @@ export async function listOrGetInquiry(request: NextRequest) {
 
       return {
         ...inquiry,
+        _id: inquiry._id?.toString(),
         staffRating: rating
           ? {
               id: rating._id.toString(),
@@ -222,6 +235,21 @@ export async function updateInquiry(request: NextRequest) {
         { error: "Inquiry not found or unauthorized" },
         { status: 404 }
       )
+    }
+
+    const updatedInquiry = await inquiriesCollection.findOne({ id: inquiryId })
+    if (updatedInquiry?.assignedStaffId) {
+      await createNotification(db, {
+        recipientId: updatedInquiry.assignedStaffId,
+        recipientRole: "staff",
+        type: "inquiry-updated",
+        title: "Inquiry updated",
+        message: `Inquiry ${updatedInquiry.id} was updated by the user.`,
+        href: `/support/messages/${encodeURIComponent(updatedInquiry.id)}`,
+        inquiryId: updatedInquiry.id,
+        actorId: (session?.user as any)?.id!,
+        actorName: session?.user?.name || session?.user?.email || "Standard User",
+      })
     }
 
     return NextResponse.json(

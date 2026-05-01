@@ -5,9 +5,18 @@ import { useSession } from "next-auth/react"
 import { redirect, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Header } from "@/components/header"
-import { User, Mail, CircleDot, PlayCircle, CheckCircle2, Clock3 } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { ClipboardList, User, Mail, CircleDot, PlayCircle, CheckCircle2, Clock3, Megaphone } from "lucide-react"
 import { toast } from "sonner"
 
 type InquiryCounts = {
@@ -18,12 +27,17 @@ type InquiryCounts = {
   closed: number
 }
 
+type AnnouncementAudience = "standard" | "staff"
+
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const role = (session?.user as any)?.role
   const isAdmin = role === "admin"
   const canViewRecords = role === "admin" || role === "staff"
+  const [announcement, setAnnouncement] = useState("")
+  const [savingAnnouncement, setSavingAnnouncement] = useState(false)
+  const [announcementConfirmOpen, setAnnouncementConfirmOpen] = useState(false)
   const [counts, setCounts] = useState<InquiryCounts>({
     total: 0,
     pending: 0,
@@ -50,7 +64,7 @@ export default function DashboardPage() {
       controller = new AbortController()
 
       try {
-        const res = await fetch("/api/v1/inquiries/admin", {
+        const res = await fetch("/api/v1/inquiries/admin?summary=true", {
           credentials: "include",
           signal: controller.signal,
         })
@@ -60,18 +74,13 @@ export default function DashboardPage() {
           throw new Error(data.error || "Failed to load inquiry counts")
         }
 
-        const inquiries = Array.isArray(data.data) ? data.data : []
-        const nextCounts = inquiries.reduce(
-          (acc: InquiryCounts, inquiry: any) => {
-            acc.total += 1
-            if (inquiry.status === "pending") acc.pending += 1
-            if (inquiry.status === "in-progress") acc["in-progress"] += 1
-            if (inquiry.status === "resolved") acc.resolved += 1
-            if (inquiry.status === "closed") acc.closed += 1
-            return acc
-          },
-          { total: 0, pending: 0, "in-progress": 0, resolved: 0, closed: 0 }
-        )
+        const nextCounts = data.summary || {
+          total: 0,
+          pending: 0,
+          "in-progress": 0,
+          resolved: 0,
+          closed: 0,
+        }
 
         if (isActive) {
           setCounts(nextCounts)
@@ -93,6 +102,34 @@ export default function DashboardPage() {
       clearInterval(interval)
     }
   }, [canViewRecords])
+
+  const sendAnnouncement = async (targetRole: AnnouncementAudience) => {
+    if (!announcement.trim() || savingAnnouncement) return
+
+    setSavingAnnouncement(true)
+    try {
+      const res = await fetch("/api/v1/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ title: "Announcement", message: announcement, targetRole }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to send announcement")
+
+      setAnnouncement("")
+      setAnnouncementConfirmOpen(false)
+      toast.success(
+        targetRole === "standard"
+          ? "Announcement sent to standard users"
+          : "Announcement sent to staff"
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send announcement")
+    } finally {
+      setSavingAnnouncement(false)
+    }
+  }
 
   if (status === "loading") {
     return (
@@ -203,7 +240,109 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {isAdmin ? (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <Card className="flex h-full flex-col">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Megaphone className="h-5 w-5" />
+                  Announcements
+                </CardTitle>
+                <CardDescription>Send an announcement to users.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col gap-4">
+                <Textarea
+                  value={announcement}
+                  onChange={(event) => setAnnouncement(event.target.value)}
+                  placeholder="Write an announcement..."
+                  rows={5}
+                  className="resize-none bg-white"
+                  maxLength={500}
+                />
+                <div className="mt-auto flex items-center justify-between gap-3">
+                  <p className="text-xs text-muted-foreground">{announcement.trim().length}/500</p>
+                  <Button
+                    type="button"
+                    className="cursor-pointer"
+                    disabled={!announcement.trim() || savingAnnouncement}
+                    onClick={() => setAnnouncementConfirmOpen(true)}
+                  >
+                    {savingAnnouncement ? "Sending..." : "Send Announcement"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="flex h-full flex-col">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5" />
+                  Audit Logs
+                </CardTitle>
+                <CardDescription>Review staff activity with complete details and timestamps.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col gap-4">
+                <p className="text-sm text-muted-foreground">
+                  Track staff actions such as assigned inquiries, rejected tickets, status changes, and conversation activity.
+                </p>
+                <div className="mt-auto pt-4">
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href="/dashboard/audit-logs">View Audit Logs</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
       </main>
+
+      <Dialog open={announcementConfirmOpen} onOpenChange={setAnnouncementConfirmOpen}>
+        <DialogContent className="sm:max-w-lg [&>button]:cursor-pointer">
+          <DialogHeader>
+            <DialogTitle>Send Announcement</DialogTitle>
+            <DialogDescription>
+              Review the announcement before choosing the recipient group.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-lg border bg-muted/30 p-4">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">Preview</p>
+            <p className="max-h-56 overflow-auto whitespace-pre-wrap text-sm text-foreground">
+              {announcement.trim()}
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              disabled={savingAnnouncement}
+              onClick={() => setAnnouncementConfirmOpen(false)}
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              disabled={savingAnnouncement}
+              onClick={() => void sendAnnouncement("standard")}
+            >
+              Send to Standard Users
+            </Button>
+            <Button
+              type="button"
+              className="cursor-pointer"
+              disabled={savingAnnouncement}
+              onClick={() => void sendAnnouncement("staff")}
+            >
+              Send to Staff
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

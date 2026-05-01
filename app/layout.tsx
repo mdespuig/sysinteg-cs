@@ -5,8 +5,8 @@ import { AuthProvider } from '@/components/auth-provider'
 import '../styles/globals.css'
 
 export const metadata: Metadata = {
-  title: 'MediCare - Customer Support System',
-  description: 'Comprehensive healthcare services with authentication, inquiry management, and patient care',
+  title: 'Linepoint - Customer Support System',
+  description: 'Linepoint support services with authentication, inquiry management, and patient care',
   generator: 'v0.app',
   icons: {
     icon: [

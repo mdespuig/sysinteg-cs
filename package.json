@@ -1,12 +1,13 @@
 {
-  "name": "my-project",
+  "name": "linepoint",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "npm run build && next start",
-    "lint": "eslint .",
+    "typecheck": "tsc --noEmit --pretty false",
+    "lint": "tsc --noEmit --pretty false --noUnusedLocals --noUnusedParameters",
     "prod": "npm run start"
   },
   "dependencies": {

@@ -202,8 +202,11 @@ export default function InquiryMessagesPage() {
   const [deleteConversationOpen, setDeleteConversationOpen] = useState(false)
   const [isDeletingConversation, setIsDeletingConversation] = useState(false)
   const [participantInfo, setParticipantInfo] = useState<ParticipantInfoSelection | null>(null)
+  const [participantInfoOpen, setParticipantInfoOpen] = useState(false)
   const [mediaModal, setMediaModal] = useState<MediaModal>(null)
+  const [mediaModalOpen, setMediaModalOpen] = useState(false)
   const [imagePreview, setImagePreview] = useState<MessageAttachment | null>(null)
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeSearchIndex, setActiveSearchIndex] = useState(0)
@@ -226,6 +229,21 @@ export default function InquiryMessagesPage() {
 
   const role = (session?.user as any)?.role
   const canAccessConversation = role === "standard" || role === "staff" || role === "admin"
+
+  const openParticipantInfo = useCallback((selection: ParticipantInfoSelection) => {
+    setParticipantInfo(selection)
+    setParticipantInfoOpen(true)
+  }, [])
+
+  const openMediaModal = useCallback((modal: Exclude<MediaModal, null>) => {
+    setMediaModal(modal)
+    setMediaModalOpen(true)
+  }, [])
+
+  const openImagePreview = useCallback((attachment: MessageAttachment) => {
+    setImagePreview(attachment)
+    setImagePreviewOpen(true)
+  }, [])
 
   useEffect(() => {
     if (status === "loading") return
@@ -951,7 +969,7 @@ export default function InquiryMessagesPage() {
                                   fallbackColor={fallbackColor}
                                   label={participantLabel}
                                   side="right"
-                                  onOpenInfo={setParticipantInfo}
+                                  onOpenInfo={openParticipantInfo}
                                 />
                                 <p className="text-[10px] font-medium text-slate-300">
                                   {message.pending ? "Sending..." : formatMessageTime(message.createdAt)}
@@ -969,7 +987,7 @@ export default function InquiryMessagesPage() {
                                       <button
                                         key={`${message._id}-${attachment.name}`}
                                         type="button"
-                                        onClick={() => setImagePreview(attachment)}
+                                        onClick={() => openImagePreview(attachment)}
                                         className="cursor-pointer overflow-hidden rounded-lg border border-slate-200 bg-white text-left"
                                       >
                                         <img src={attachment.url} alt={attachment.name} className="h-28 w-36 object-cover" />
@@ -1003,13 +1021,13 @@ export default function InquiryMessagesPage() {
                     label="Inquiry created by:"
                     participant={inquiryUser}
                     fallbackColor="#006AEE"
-                    onOpenInfo={setParticipantInfo}
+                    onOpenInfo={openParticipantInfo}
                   />
                   <ParticipantByline
                     label="Inquiry responded by:"
                     participant={assignedStaff}
                     fallbackColor="#F5B400"
-                    onOpenInfo={setParticipantInfo}
+                    onOpenInfo={openParticipantInfo}
                   />
                 </div>
               </div>
@@ -1018,8 +1036,8 @@ export default function InquiryMessagesPage() {
             <aside className="hidden min-h-0 bg-white lg:flex lg:flex-col">
               <div className="border-b border-slate-200 px-6 py-10 text-center">
                 <div className="mb-3 flex items-start justify-center gap-5">
-                  <ParticipantHoverCard participant={inquiryUser} fallbackColor="#006AEE" label="User" onOpenInfo={setParticipantInfo} />
-                  <ParticipantHoverCard participant={assignedStaff} fallbackColor="#F5B400" label="Staff" onOpenInfo={setParticipantInfo} />
+                  <ParticipantHoverCard participant={inquiryUser} fallbackColor="#006AEE" label="User" onOpenInfo={openParticipantInfo} />
+                  <ParticipantHoverCard participant={assignedStaff} fallbackColor="#F5B400" label="Staff" onOpenInfo={openParticipantInfo} />
                 </div>
                 <h2 className="text-lg font-bold text-slate-950">{data?.inquiry.id}</h2>
                 <p className="text-xs text-slate-400">{lastActivityLabel}</p>
@@ -1028,9 +1046,9 @@ export default function InquiryMessagesPage() {
               <div className="border-b border-slate-200 px-6 py-4">
                 <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-300">Media</p>
                 <div className="space-y-4">
-                  <ActionRow icon={FileImage} label="Images" onClick={() => setMediaModal("images")} />
-                  <ActionRow icon={FileText} label="Files" onClick={() => setMediaModal("files")} />
-                  <ActionRow icon={LinkIcon} label="Links" onClick={() => setMediaModal("links")} />
+                  <ActionRow icon={FileImage} label="Images" onClick={() => openMediaModal("images")} />
+                  <ActionRow icon={FileText} label="Files" onClick={() => openMediaModal("files")} />
+                  <ActionRow icon={LinkIcon} label="Links" onClick={() => openMediaModal("links")} />
                 </div>
               </div>
 
@@ -1054,14 +1072,17 @@ export default function InquiryMessagesPage() {
 
         <ConversationMediaDialogs
           mediaModal={mediaModal}
-          setMediaModal={setMediaModal}
+          mediaModalOpen={mediaModalOpen}
+          setMediaModalOpen={setMediaModalOpen}
           imageAttachments={imageAttachments}
           fileAttachments={fileAttachments}
           conversationLinks={conversationLinks}
           imagePreview={imagePreview}
-          setImagePreview={setImagePreview}
+          imagePreviewOpen={imagePreviewOpen}
+          setImagePreviewOpen={setImagePreviewOpen}
+          openImagePreview={openImagePreview}
         />
-        <ParticipantInfoDialog selection={participantInfo} onOpenChange={setParticipantInfo} />
+        <ParticipantInfoDialog selection={participantInfo} open={participantInfoOpen} onOpenChange={setParticipantInfoOpen} />
 
         <AlertDialog open={deleteConversationOpen} onOpenChange={setDeleteConversationOpen}>
           <AlertDialogContent>
@@ -1141,7 +1162,11 @@ export default function InquiryMessagesPage() {
                       setStatusConfirm("closed")
                       setStatusDialogOpen(true)
                     }}
-                    disabled={updatingStatus !== null || data?.inquiry.status === "closed"}
+                    disabled={
+                      updatingStatus !== null ||
+                      data?.inquiry.status === "resolved" ||
+                      data?.inquiry.status === "closed"
+                    }
                     className="h-9 cursor-pointer rounded-lg bg-[#006AEE] px-3 text-xs text-white hover:bg-[#0054BB]"
                   >
                     <MessageCircleX className="mr-2 h-4 w-4" />
@@ -1198,7 +1223,7 @@ export default function InquiryMessagesPage() {
                                   <button
                                     key={`${message._id}-${attachment.name}`}
                                     type="button"
-                                    onClick={() => setImagePreview(attachment)}
+                                    onClick={() => openImagePreview(attachment)}
                                     className="block cursor-pointer overflow-hidden rounded-lg border border-white/20 text-left"
                                   >
                                     <img src={attachment.url} alt={attachment.name} className="max-h-56 w-full object-cover" />
@@ -1369,14 +1394,14 @@ export default function InquiryMessagesPage() {
                 avatarClassName="mx-auto mb-3 h-28 w-28"
                 showName={false}
                 centered={role === "standard" || role === "staff"}
-                onOpenInfo={setParticipantInfo}
+                onOpenInfo={openParticipantInfo}
               />
               <HoverCard>
                 <HoverCardTrigger asChild>
                   <button
                     type="button"
                     className="cursor-pointer text-lg font-bold text-slate-950 underline-offset-4 hover:underline"
-                    onClick={() => setParticipantInfo({ participant: peer, fallbackColor: "#006AEE", label: "Participant" })}
+                    onClick={() => openParticipantInfo({ participant: peer, fallbackColor: "#006AEE", label: "Participant" })}
                   >
                     {peerName}
                   </button>
@@ -1397,9 +1422,9 @@ export default function InquiryMessagesPage() {
             <div className="border-b border-slate-200 px-6 py-4">
               <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-300">Media</p>
               <div className="space-y-4">
-                <ActionRow icon={FileImage} label="Images" onClick={() => setMediaModal("images")} />
-                <ActionRow icon={FileText} label="Files" onClick={() => setMediaModal("files")} />
-                <ActionRow icon={LinkIcon} label="Links" onClick={() => setMediaModal("links")} />
+                <ActionRow icon={FileImage} label="Images" onClick={() => openMediaModal("images")} />
+                <ActionRow icon={FileText} label="Files" onClick={() => openMediaModal("files")} />
+                <ActionRow icon={LinkIcon} label="Links" onClick={() => openMediaModal("links")} />
               </div>
             </div>
 
@@ -1415,14 +1440,17 @@ export default function InquiryMessagesPage() {
 
       <ConversationMediaDialogs
         mediaModal={mediaModal}
-        setMediaModal={setMediaModal}
+        mediaModalOpen={mediaModalOpen}
+        setMediaModalOpen={setMediaModalOpen}
         imageAttachments={imageAttachments}
         fileAttachments={fileAttachments}
         conversationLinks={conversationLinks}
         imagePreview={imagePreview}
-        setImagePreview={setImagePreview}
+        imagePreviewOpen={imagePreviewOpen}
+        setImagePreviewOpen={setImagePreviewOpen}
+        openImagePreview={openImagePreview}
       />
-      <ParticipantInfoDialog selection={participantInfo} onOpenChange={setParticipantInfo} />
+      <ParticipantInfoDialog selection={participantInfo} open={participantInfoOpen} onOpenChange={setParticipantInfoOpen} />
 
       <Dialog open={ratingDialogOpen && role === "standard" && data?.inquiry.status === "resolved" && !data.inquiry.staffRating} onOpenChange={setRatingDialogOpen}>
         <DialogContent className="sm:max-w-md [&>button]:cursor-pointer">
@@ -1615,24 +1643,30 @@ function RatingDetails({ rating }: { rating: StaffRating }) {
 
 function ConversationMediaDialogs({
   mediaModal,
-  setMediaModal,
+  mediaModalOpen,
+  setMediaModalOpen,
   imageAttachments,
   fileAttachments,
   conversationLinks,
   imagePreview,
-  setImagePreview,
+  imagePreviewOpen,
+  setImagePreviewOpen,
+  openImagePreview,
 }: {
   mediaModal: MediaModal
-  setMediaModal: (value: MediaModal) => void
+  mediaModalOpen: boolean
+  setMediaModalOpen: (value: boolean) => void
   imageAttachments: MessageAttachment[]
   fileAttachments: MessageAttachment[]
   conversationLinks: string[]
   imagePreview: MessageAttachment | null
-  setImagePreview: (value: MessageAttachment | null) => void
+  imagePreviewOpen: boolean
+  setImagePreviewOpen: (value: boolean) => void
+  openImagePreview: (attachment: MessageAttachment) => void
 }) {
   return (
     <>
-      <Dialog open={mediaModal !== null} onOpenChange={(open) => !open && setMediaModal(null)}>
+      <Dialog open={mediaModalOpen} onOpenChange={setMediaModalOpen}>
         <DialogContent className="sm:max-w-2xl [&>button]:cursor-pointer">
           <DialogHeader>
             <DialogTitle>
@@ -1654,7 +1688,7 @@ function ConversationMediaDialogs({
                   <button
                     key={`${attachment.name}-${index}`}
                     type="button"
-                    onClick={() => setImagePreview(attachment)}
+                    onClick={() => openImagePreview(attachment)}
                     className="cursor-pointer overflow-hidden rounded-lg border bg-slate-50 text-left transition hover:bg-slate-100"
                   >
                     <img src={attachment.url} alt={attachment.name} className="aspect-square w-full object-cover" />
@@ -1715,7 +1749,7 @@ function ConversationMediaDialogs({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={imagePreview !== null} onOpenChange={(open) => !open && setImagePreview(null)}>
+      <Dialog open={imagePreviewOpen} onOpenChange={setImagePreviewOpen}>
         <DialogContent className="border-0 bg-[#F1FBFF] p-6 shadow-2xl sm:max-w-4xl [&>button]:cursor-pointer [&>button]:opacity-70 [&>button]:hover:opacity-100">
           <DialogHeader className="pr-14">
             <DialogTitle className="text-xl font-bold text-slate-950">{imagePreview?.name || "Image preview"}</DialogTitle>
@@ -1859,13 +1893,15 @@ function ParticipantNameAction({
 
 function ParticipantInfoDialog({
   selection,
+  open,
   onOpenChange,
 }: {
   selection: ParticipantInfoSelection | null
-  onOpenChange: (selection: ParticipantInfoSelection | null) => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }) {
   return (
-    <Dialog open={selection !== null} onOpenChange={(open) => !open && onOpenChange(null)}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm [&>button]:cursor-pointer">
         <DialogHeader>
           <DialogTitle>User Information</DialogTitle>

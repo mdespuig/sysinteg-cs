@@ -7,6 +7,7 @@ import { useSession, signOut } from "next-auth/react"
 import { HeartPulse, LogOut, User } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { NotificationMenu } from "@/components/notification-menu"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -131,13 +132,13 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
   const avatarLetter = session?.user?.name?.[0]?.toUpperCase() || "U"
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+    <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/80">
       <div className="container mx-auto grid h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-4">
         <Link href="/" className="flex items-center gap-2 justify-self-start">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
             <HeartPulse className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-lg font-semibold text-foreground">MediCare Health</span>
+          <span className="text-lg font-semibold text-foreground">Linepoint</span>
         </Link>
 
         <nav className="hidden grid-flow-col auto-cols-[8.75rem] items-center justify-center gap-2 md:grid justify-self-center">
@@ -171,45 +172,48 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
 
         <div className="flex items-center justify-self-end gap-2">
           {session?.user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-[#006AEE]/10 hover:text-foreground cursor-pointer">
-                  <Avatar className="h-8 w-8">
-                    {profileImage ? (
-                      <AvatarImage src={profileImage} alt="Profile avatar" className="h-full w-full object-cover" />
-                    ) : (
-                      <AvatarFallback
-                        className="bg-[#006AEE] text-sm font-semibold text-white"
-                      >
-                        {avatarLetter}
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  <span className="text-sm font-medium text-foreground hidden sm:inline">
-                    {session.user.name}
-                  </span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem asChild>
-                  <Link
-                    href="/profile"
-                    className="cursor-pointer flex items-center gap-2 data-[highlighted]:bg-[#006AEE]/10 data-[highlighted]:text-foreground hover:bg-[#006AEE]/10 hover:text-foreground"
+            <>
+              <NotificationMenu />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-[#006AEE]/10 hover:text-foreground cursor-pointer">
+                    <Avatar className="h-8 w-8">
+                      {profileImage ? (
+                        <AvatarImage src={profileImage} alt="Profile avatar" className="h-full w-full object-cover" />
+                      ) : (
+                        <AvatarFallback
+                          className="bg-[#006AEE] text-sm font-semibold text-white"
+                        >
+                          {avatarLetter}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <span className="text-sm font-medium text-foreground hidden sm:inline">
+                      {session.user.name}
+                    </span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/profile"
+                      className="cursor-pointer flex items-center gap-2 data-highlighted:bg-[#006AEE]/10 data-highlighted:text-foreground hover:bg-[#006AEE]/10 hover:text-foreground"
+                    >
+                      <User className="h-4 w-4" />
+                      Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="cursor-pointer flex items-center gap-2 text-red-600 data-highlighted:bg-[#006AEE]/10 data-highlighted:text-red-600 hover:bg-[#006AEE]/10 hover:text-red-600"
                   >
-                    <User className="h-4 w-4" />
-                    Profile
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="cursor-pointer flex items-center gap-2 text-red-600 data-[highlighted]:bg-[#006AEE]/10 data-[highlighted]:text-red-600 hover:bg-[#006AEE]/10 hover:text-red-600"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
           ) : (
             <>
               <Button variant="ghost" asChild>

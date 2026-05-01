@@ -18,6 +18,7 @@ import {
   Search,
   Star,
   Trash2,
+  XCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -53,6 +54,7 @@ type SortableInquiry = Inquiry & {
   assignedStaff?: string
   assignedStaffId?: string | null
   resolvedBy?: string | null
+  closedBy?: string | null
   staffRating?: StaffRating | null
 }
 
@@ -83,6 +85,7 @@ export default function RecordsPage() {
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
   const [assigningInquiryId, setAssigningInquiryId] = useState<string | null>(null)
+  const [rejectingInquiryId, setRejectingInquiryId] = useState<string | null>(null)
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
   const [selectedInquiry, setSelectedInquiry] = useState<SortableInquiry | null>(null)
   const isMountedRef = useRef(true)
@@ -220,8 +223,6 @@ export default function RecordsPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / size))
   const safePage = Math.min(page, totalPages)
   const pageItems = filtered.slice((safePage - 1) * size, safePage * size)
-  const selectedCount = selectedIds.length
-  const selectedTotal = filtered.length
   const staffCurrentInquiry = useMemo(() => {
     if (!staffId) return null
     return items.find((item) => item.assignedStaffId === staffId && item.status === "in-progress") || null
@@ -314,6 +315,10 @@ export default function RecordsPage() {
     setDetailsDialogOpen(true)
   }
 
+  const closeInquiryDetails = () => {
+    setDetailsDialogOpen(false)
+  }
+
   const handleAssignInquiry = async (inquiryId: string) => {
     if (assigningInquiryId) return
 
@@ -347,6 +352,44 @@ export default function RecordsPage() {
       toast.error(error instanceof Error ? error.message : "Failed to assign inquiry")
     } finally {
       setAssigningInquiryId(null)
+    }
+  }
+
+  const handleRejectInquiry = async (inquiryId: string) => {
+    if (rejectingInquiryId) return
+
+    setRejectingInquiryId(inquiryId)
+    try {
+      const res = await fetch("/api/v1/inquiries/admin", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ inquiryId, action: "reject" }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to reject inquiry")
+      }
+
+      toast.success("Inquiry rejected")
+      await loadData()
+      setSelectedInquiry((current) =>
+        current?.id === inquiryId
+          ? {
+              ...current,
+              status: "closed",
+              closedBy: staffId || null,
+              assignedStaffId: staffId || null,
+              assignedStaff: session?.user?.name || "Assigned Staff",
+              updatedAt: new Date(),
+            }
+          : current
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to reject inquiry")
+    } finally {
+      setRejectingInquiryId(null)
     }
   }
 
@@ -641,6 +684,11 @@ export default function RecordsPage() {
                               Resolved by you
                             </Badge>
                           ) : null}
+                          {isStaff && item.status === "closed" && (item.closedBy === staffId || item.assignedStaffId === staffId) ? (
+                            <Badge variant="outline" className="border-slate-300 bg-slate-100 text-slate-700">
+                              Closed by you
+                            </Badge>
+                          ) : null}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-slate-700">{item.assignedStaff}</td>
@@ -751,10 +799,12 @@ export default function RecordsPage() {
       <Dialog
         open={detailsDialogOpen}
         onOpenChange={(open) => {
-          setDetailsDialogOpen(open)
-          if (!open) {
-            setSelectedInquiry(null)
+          if (open) {
+            setDetailsDialogOpen(true)
+            return
           }
+
+          closeInquiryDetails()
         }}
       >
         <DialogContent className="sm:max-w-2xl [&>button]:cursor-pointer">
@@ -873,13 +923,13 @@ export default function RecordsPage() {
               type="button"
               variant="outline"
               className="cursor-pointer"
-              onClick={() => setDetailsDialogOpen(false)}
+              onClick={closeInquiryDetails}
             >
               Close
             </Button>
             {isStaff && selectedInquiry ? (
               selectedInquiry.assignedStaffId === staffId &&
-              (selectedInquiry.status === "in-progress" || selectedInquiry.status === "resolved") ? (
+              (selectedInquiry.status === "in-progress" || selectedInquiry.status === "resolved" || selectedInquiry.status === "closed") ? (
                 <Button type="button" className="cursor-pointer" asChild>
                   <Link href={`/support/messages/${encodeURIComponent(selectedInquiry.id)}`}>
                     <MessageCircle className="mr-2 h-4 w-4" />
@@ -887,14 +937,26 @@ export default function RecordsPage() {
                   </Link>
                 </Button>
               ) : selectedInquiry.status === "pending" && !selectedInquiry.assignedStaffId && !staffCurrentInquiry ? (
-                <Button
-                  type="button"
-                  className="cursor-pointer"
-                  disabled={assigningInquiryId === selectedInquiry.id}
-                  onClick={() => void handleAssignInquiry(selectedInquiry.id)}
-                >
-                  {assigningInquiryId === selectedInquiry.id ? "Assigning..." : "Assign to Me"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="cursor-pointer border-red-300 text-red-700 hover:border-red-300 hover:bg-red-600 hover:text-white"
+                    disabled={rejectingInquiryId === selectedInquiry.id}
+                    onClick={() => void handleRejectInquiry(selectedInquiry.id)}
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    {rejectingInquiryId === selectedInquiry.id ? "Rejecting..." : "Reject"}
+                  </Button>
+                  <Button
+                    type="button"
+                    className="cursor-pointer"
+                    disabled={assigningInquiryId === selectedInquiry.id}
+                    onClick={() => void handleAssignInquiry(selectedInquiry.id)}
+                  >
+                    {assigningInquiryId === selectedInquiry.id ? "Assigning..." : "Assign to Me"}
+                  </Button>
+                </div>
               ) : (
                 <Button type="button" disabled>
                   {staffCurrentInquiry

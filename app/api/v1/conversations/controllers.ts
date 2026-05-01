@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth"
 import { authConfig } from "@/auth"
 import clientPromise from "@/lib/db"
 import type { AssignedStaffInfo } from "@/lib/conversation-data"
+import { logAdminActivity, logStaffActivity } from "@/lib/audit-logs"
+import { createNotification, createNotificationsForRole } from "@/lib/notifications"
 
 const DATABASE_NAME = "healthcare"
 const INQUIRIES_COLLECTION = "inquiries"
@@ -426,6 +428,49 @@ export async function createConversationMessage(request: NextRequest) {
       { $set: { updatedAt: now, lastMessageAt: now } }
     )
 
+    if (auth.role === "staff" && inquiry.userId) {
+      await createNotification(db, {
+        recipientId: inquiry.userId,
+        recipientRole: "standard",
+        type: "message-received",
+        title: "Staff messaged you",
+        message: `${message.senderName} sent a message on inquiry ${inquiry.id}.`,
+        href: `/support/messages/${encodeURIComponent(inquiry.id)}`,
+        inquiryId: inquiry.id,
+        actorId: auth.userId!,
+        actorName: message.senderName,
+      })
+
+      await logStaffActivity(db, {
+        action: "conversation.message.sent",
+        staffId: auth.userId!,
+        staffName: message.senderName,
+        inquiryId: inquiry.id,
+        title: "Staff message sent",
+        description: `${message.senderName} sent a message on inquiry ${inquiry.id}.`,
+        metadata: {
+          attachmentCount: attachments.length,
+          messageLength: content.length,
+          userId: inquiry.userId || null,
+        },
+        createdAt: now,
+      })
+    }
+
+    if (auth.role === "standard" && inquiry.assignedStaffId) {
+      await createNotification(db, {
+        recipientId: inquiry.assignedStaffId,
+        recipientRole: "staff",
+        type: "message-received",
+        title: "User messaged you",
+        message: `${message.senderName} sent a message on inquiry ${inquiry.id}.`,
+        href: `/support/messages/${encodeURIComponent(inquiry.id)}`,
+        inquiryId: inquiry.id,
+        actorId: auth.userId!,
+        actorName: message.senderName,
+      })
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -474,6 +519,19 @@ export async function deleteConversation(request: NextRequest) {
       db.collection(TYPING_COLLECTION).deleteMany({ inquiryId }),
       db.collection(CONVERSATIONS_COLLECTION).deleteOne({ _id: conversation._id }),
     ])
+
+    const adminName = auth.session!.user?.name || auth.session!.user?.email || "Admin"
+    await logAdminActivity(db, {
+      action: "conversation.deleted",
+      adminId: auth.userId!,
+      adminName,
+      inquiryId,
+      title: "Conversation deleted",
+      description: `${adminName} deleted the conversation for inquiry ${inquiryId}.`,
+      metadata: {
+        conversationId: conversation._id.toString(),
+      },
+    })
 
     return NextResponse.json(
       { success: true, message: "Conversation deleted successfully" },
@@ -549,7 +607,6 @@ export async function updateConversationInquiryStatus(request: NextRequest) {
 
     if (!existingStatusMessage) {
       const actorName = auth.session!.user?.name || (auth.role === "staff" ? "Staff" : "Admin")
-      const statusLabel = nextStatus === "resolved" ? "resolved" : "closed"
       const content =
         nextStatus === "resolved"
           ? `Hello, ${inquiry.patientName || "there"}. Kindly be informed that your inquiry ${inquiry.id} has been successfully resolved. Thank you for allowing us to assist you. We would greatly appreciate your feedback and service rating.`
@@ -570,6 +627,83 @@ export async function updateConversationInquiryStatus(request: NextRequest) {
         { _id: conversation._id },
         { $set: { updatedAt: now, lastMessageAt: now } }
       )
+    }
+
+    if (inquiry.userId) {
+      await createNotification(db, {
+        recipientId: inquiry.userId,
+        recipientRole: "standard",
+        type: nextStatus === "resolved" ? "inquiry-resolved" : "inquiry-closed",
+        title: nextStatus === "resolved" ? "Your inquiry was resolved" : "Your inquiry was closed",
+        message: `Inquiry ${inquiry.id} has been ${nextStatus}.`,
+        href: `/support/messages/${encodeURIComponent(inquiry.id)}`,
+        inquiryId: inquiry.id,
+        actorId: auth.userId!,
+        actorName: auth.session!.user?.name || (auth.role === "staff" ? "Staff" : "Admin"),
+        dedupeKey: `inquiry-${nextStatus}:${inquiry.id}`,
+      })
+
+      if (nextStatus === "resolved") {
+        await createNotification(db, {
+          recipientId: inquiry.userId,
+          recipientRole: "standard",
+          type: "rating-requested",
+          title: "Rate your support experience",
+          message: `Please rate the assistance you received for inquiry ${inquiry.id}.`,
+          href: `/support/messages/${encodeURIComponent(inquiry.id)}`,
+          inquiryId: inquiry.id,
+          actorId: auth.userId!,
+          actorName: auth.session!.user?.name || "Staff",
+          dedupeKey: `rating-requested:${inquiry.id}`,
+        })
+      }
+    }
+
+    if (auth.role === "staff") {
+      const actorName = auth.session!.user?.name || "Staff"
+      await createNotificationsForRole(db, ["admin"], {
+        type: nextStatus === "resolved" ? "inquiry-resolved" : "inquiry-closed",
+        title: nextStatus === "resolved" ? "Staff resolved an inquiry" : "Staff closed an inquiry",
+        message: `${actorName} marked inquiry ${inquiry.id} as ${nextStatus}.`,
+        href: "/dashboard/records",
+        inquiryId: inquiry.id,
+        actorId: auth.userId!,
+        actorName,
+        dedupeKey: `admin-inquiry-${nextStatus}:${inquiry.id}`,
+      })
+
+      await logStaffActivity(db, {
+        action: nextStatus === "resolved" ? "inquiry.resolved" : "inquiry.closed",
+        staffId: auth.userId!,
+        staffName: actorName,
+        inquiryId: inquiry.id,
+        title: nextStatus === "resolved" ? "Inquiry resolved" : "Inquiry closed",
+        description: `${actorName} marked inquiry ${inquiry.id} as ${nextStatus}.`,
+        metadata: {
+          previousStatus: inquiry.status || null,
+          nextStatus,
+          userId: inquiry.userId || null,
+        },
+        createdAt: now,
+      })
+    }
+
+    if (auth.role === "admin") {
+      const adminName = auth.session!.user?.name || auth.session!.user?.email || "Admin"
+      await logAdminActivity(db, {
+        action: nextStatus === "resolved" ? "inquiry.resolved" : "inquiry.closed",
+        adminId: auth.userId!,
+        adminName,
+        inquiryId: inquiry.id,
+        title: nextStatus === "resolved" ? "Inquiry resolved" : "Inquiry closed",
+        description: `${adminName} marked inquiry ${inquiry.id} as ${nextStatus}.`,
+        metadata: {
+          previousStatus: inquiry.status || null,
+          nextStatus,
+          userId: inquiry.userId || null,
+        },
+        createdAt: now,
+      })
     }
 
     return NextResponse.json(

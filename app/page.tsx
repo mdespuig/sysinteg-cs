@@ -157,9 +157,9 @@ export default function LandingPage() {
         <div className="container mx-auto px-4 py-16 md:py-20">
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <div>
-              <h2 className="mb-4 text-3xl font-bold text-foreground">About MediCare Health</h2>
+              <h2 className="mb-4 text-3xl font-bold text-foreground">About Linepoint</h2>
               <p className="mb-6 leading-relaxed text-muted-foreground">
-                For over 25 years, MediCare Health has been at the forefront of healthcare excellence. 
+                For over 25 years, Linepoint has been at the forefront of healthcare excellence. 
                 Our commitment to patient-centered care, combined with cutting-edge technology and 
                 a team of dedicated professionals, makes us a trusted partner in your health journey.
               </p>
@@ -266,11 +266,11 @@ export default function LandingPage() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <HeartPulse className="h-4 w-4 text-primary-foreground" />
               </div>
-              <span className="font-semibold text-foreground">MediCare Health</span>
+              <span className="font-semibold text-foreground">Linepoint</span>
             </div>
             <div className="text-center md:text-right">
               <p className="text-sm text-muted-foreground">
-                2026 MediCare Health System. All rights reserved.
+                2026 Linepoint. All rights reserved.
               </p>
               <p className="text-sm text-muted-foreground">
                 Cobilla, Despuig, Esmabe, Mapa | ITMC321 - ZT32
