@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import { useState } from "react"
-import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import { getSession, signIn } from "next-auth/react"
 import { Eye, EyeOff, HeartPulse, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,11 +31,16 @@ export default function LoginPage() {
 
       if (result?.error) {
         toast.error(result.error)
-      } else if (result?.ok) {
-        toast.success("Login successful!")
-        router.push("/dashboard")
-        router.refresh()
+        return
       }
+
+      const session = await getSession()
+      const role = (session?.user as any)?.role
+      const redirectTo = role === "standard" ? "/" : "/dashboard"
+
+      toast.success("Logged in successfully")
+      router.push(redirectTo)
+      router.refresh()
     } catch (error) {
       toast.error("An error occurred during login")
     } finally {

@@ -166,7 +166,7 @@ export default function ProfilePage() {
       if (!session?.user?.id) return
 
       try {
-        const response = await fetch(`/api/v1/profile?userId=${session.user.id}`, {
+        const response = await fetch("/api/v1/profile", {
           signal: controller.signal,
         })
         if (!isActive) return
@@ -418,8 +418,6 @@ export default function ProfilePage() {
 
     try {
       const payload = {
-        userId: session?.user?.id,
-        isAdmin,
         profileImage: profileData.profileImage,
         personalData: {
           ...profileData.personalData,
@@ -469,7 +467,6 @@ export default function ProfilePage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: session.user.id,
           avatarOnly: true,
           profileImage: profileData.profileImage,
         }),

@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useSession, signOut } from "next-auth/react"
+import { usePathname, useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { HeartPulse, LogOut, User } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,7 @@ type HeaderProps = {
 export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: HeaderProps) {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const router = useRouter()
   const role = (session?.user as any)?.role
   const isPrivilegedUser = role === "admin" || role === "staff"
   const isAdmin = role === "admin"
@@ -33,8 +34,18 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
 
   const handleLogout = async () => {
     try {
-      await signOut({ callbackUrl: "/auth/login", redirect: true })
-      toast.success("Logged out successfully")
+      const response = await fetch("/api/v1/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+      const data = await response.json()
+
+      if (!response.ok || data?.success === false) {
+        throw new Error(data?.error || "Logout failed")
+      }
+
+      toast.success(data?.message || "You have successfully logged out")
+      router.push(data?.redirectTo || "/auth/login")
     } catch (error) {
       console.error("Logout failed:", error)
       toast.error("Failed to log out. Please try again.")

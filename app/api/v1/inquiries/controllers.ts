@@ -97,17 +97,33 @@ export async function listOrGetInquiry(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
+    const session = await getServerSession(authConfig)
+    const currentUserId = (session?.user as any)?.id as string | undefined
+    const role = (session?.user as any)?.role as string | undefined
 
     const client = await clientPromise
     const db = client.db("healthcare")
     const inquiriesCollection = db.collection("inquiries")
 
     if (id) {
-      const inquiry = await inquiriesCollection.findOne({ id: id.toUpperCase() })
+      if (!currentUserId || !role) {
+        return NextResponse.json(
+          { error: "Authentication required" },
+          { status: 401 }
+        )
+      }
+
+      const inquiry =
+        role === "admin"
+          ? await inquiriesCollection.findOne({ id: id.toUpperCase() })
+          : await inquiriesCollection.findOne({
+              id: id.toUpperCase(),
+              userId: currentUserId,
+            })
       if (!inquiry) {
         return NextResponse.json(
-          { error: "Inquiry not found" },
-          { status: 404 }
+          { error: "Inquiry not found or unauthorized" },
+          { status: 403 }
         )
       }
       const rating = await db.collection(STAFF_RATINGS_COLLECTION).findOne({ inquiryId: inquiry.id })
@@ -131,13 +147,11 @@ export async function listOrGetInquiry(request: NextRequest) {
               : inquiry.staffRating || null,
           },
         },
-        { status: 200 }
+      { status: 200 }
       )
     }
 
-    const session = await getServerSession(authConfig)
-
-    if (!(session?.user as any)?.id) {
+    if (!currentUserId || !role) {
       return NextResponse.json(
         { error: "Authentication required to view inquiries" },
         { status: 401 }
@@ -145,14 +159,14 @@ export async function listOrGetInquiry(request: NextRequest) {
     }
 
     const inquiries = await inquiriesCollection
-      .find({ userId: (session?.user as any)?.id! })
+      .find(role === "admin" ? {} : { userId: currentUserId })
       .sort({ createdAt: -1 })
       .toArray()
     const inquiryIds = inquiries.map((inquiry) => inquiry.id).filter(Boolean)
     const ratings = inquiryIds.length
       ? await db
           .collection(STAFF_RATINGS_COLLECTION)
-          .find({ inquiryId: { $in: inquiryIds }, userId: (session?.user as any)?.id! })
+          .find(role === "admin" ? { inquiryId: { $in: inquiryIds } } : { inquiryId: { $in: inquiryIds }, userId: currentUserId })
           .toArray()
       : []
     const ratingMap = new Map(ratings.map((rating) => [rating.inquiryId, rating]))
@@ -197,11 +211,12 @@ export async function listOrGetInquiry(request: NextRequest) {
 export async function updateInquiry(request: NextRequest) {
   try {
     const session = await getServerSession(authConfig)
+    const role = (session?.user as any)?.role as string | undefined
 
-    if (!(session?.user as any)?.id) {
+    if (!(session?.user as any)?.id || role !== "admin") {
       return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
+        { error: "Admin access required" },
+        { status: 403 }
       )
     }
 
@@ -220,7 +235,7 @@ export async function updateInquiry(request: NextRequest) {
     const inquiriesCollection = db.collection("inquiries")
 
     const result = await inquiriesCollection.updateOne(
-      { id: inquiryId, userId: (session?.user as any)?.id! },
+      { id: inquiryId },
       {
         $set: {
           ...(status && { status }),
@@ -268,11 +283,12 @@ export async function updateInquiry(request: NextRequest) {
 export async function deleteInquiry(request: NextRequest) {
   try {
     const session = await getServerSession(authConfig)
+    const role = (session?.user as any)?.role as string | undefined
 
-    if (!(session?.user as any)?.id) {
+    if (!(session?.user as any)?.id || role !== "admin") {
       return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
+        { error: "Admin access required" },
+        { status: 403 }
       )
     }
 
@@ -292,7 +308,6 @@ export async function deleteInquiry(request: NextRequest) {
 
     const result = await inquiriesCollection.deleteOne({
       id: inquiryId,
-      userId: (session?.user as any)?.id!,
     })
 
     if (result.deletedCount === 0) {
