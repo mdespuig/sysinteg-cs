@@ -16,6 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ClipboardList, User, Mail, CircleDot, PlayCircle, CheckCircle2, Clock3, Megaphone } from "lucide-react"
 import { toast } from "sonner"
 
@@ -28,6 +30,7 @@ type InquiryCounts = {
 }
 
 type AnnouncementAudience = "standard" | "staff"
+type AnnouncementAudienceExtended = AnnouncementAudience | "all"
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
@@ -38,6 +41,7 @@ export default function DashboardPage() {
   const [announcement, setAnnouncement] = useState("")
   const [savingAnnouncement, setSavingAnnouncement] = useState(false)
   const [announcementConfirmOpen, setAnnouncementConfirmOpen] = useState(false)
+  const [announcementTarget, setAnnouncementTarget] = useState<AnnouncementAudienceExtended>("all")
   const [counts, setCounts] = useState<InquiryCounts>({
     total: 0,
     pending: 0,
@@ -103,7 +107,7 @@ export default function DashboardPage() {
     }
   }, [canViewRecords])
 
-  const sendAnnouncement = async (targetRole: AnnouncementAudience) => {
+  const sendAnnouncement = async (targetRole: AnnouncementAudienceExtended) => {
     if (!announcement.trim() || savingAnnouncement) return
 
     setSavingAnnouncement(true)
@@ -122,7 +126,9 @@ export default function DashboardPage() {
       toast.success(
         targetRole === "standard"
           ? "Announcement sent to standard users"
-          : "Announcement sent to staff"
+          : targetRole === "staff"
+          ? "Announcement sent to staff"
+          : "Announcement sent to all users"
       )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to send announcement")
@@ -306,11 +312,76 @@ export default function DashboardPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="rounded-lg border bg-muted/30 p-4">
-            <p className="mb-2 text-xs font-medium text-muted-foreground">Preview</p>
-            <p className="max-h-56 overflow-auto whitespace-pre-wrap text-sm text-foreground">
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <p className="mb-1 text-xs font-medium text-muted-foreground">Preview</p>
+            <p className="max-h-40 overflow-auto whitespace-pre-wrap text-sm text-foreground">
               {announcement.trim()}
             </p>
+
+            <div>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-[10px] text-muted-foreground">
+                  Recipient
+                </p>
+                <p className="text-[10px] font-medium text-foreground">
+                  {announcementTarget === "all"
+                    ? "All"
+                    : announcementTarget === "standard"
+                    ? "Standard Users"
+                    : "Staff"}
+                </p>
+              </div>
+
+              <RadioGroup
+                value={announcementTarget}
+                onValueChange={(value) => setAnnouncementTarget(value as AnnouncementAudienceExtended)}
+                className="grid gap-3 sm:grid-cols-3"
+              >
+                {[
+                  {
+                    value: "all",
+                    title: "All",
+                    description: "Send to all users",
+                  },
+                  {
+                    value: "standard",
+                    title: "Standard Users",
+                    description: "Send to customers only",
+                  },
+                  {
+                    value: "staff",
+                    title: "Staff",
+                    description: "Send to staff members only",
+                  },
+                ].map((option) => (
+                  <Label
+                    key={option.value}
+                    htmlFor={`announcement-target-${option.value}`}
+                    className={`group relative flex cursor-pointer flex-col gap-2 rounded-xl border bg-background p-3 transition-all hover:border-primary/50 hover:bg-primary/5 ${
+                      announcementTarget === option.value
+                        ? "border-primary bg-primary/5 shadow-sm"
+                        : "border-border"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="block text-sm font-medium text-foreground">
+                          {option.title}
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                          {option.description}
+                        </span>
+                      </div>
+                      <RadioGroupItem
+                        id={`announcement-target-${option.value}`}
+                        value={option.value}
+                        className="mt-0.5 size-5 border-muted-foreground/30 bg-background text-primary shadow-none transition-transform group-hover:scale-105"
+                      />
+                    </div>
+                  </Label>
+                ))}
+              </RadioGroup>
+            </div>
           </div>
 
           <DialogFooter className="gap-2 sm:justify-end">
@@ -325,20 +396,11 @@ export default function DashboardPage() {
             </Button>
             <Button
               type="button"
-              variant="outline"
               className="cursor-pointer"
               disabled={savingAnnouncement}
-              onClick={() => void sendAnnouncement("standard")}
+              onClick={() => void sendAnnouncement(announcementTarget)}
             >
-              Send to Standard Users
-            </Button>
-            <Button
-              type="button"
-              className="cursor-pointer"
-              disabled={savingAnnouncement}
-              onClick={() => void sendAnnouncement("staff")}
-            >
-              Send to Staff
+              {savingAnnouncement ? "Sending..." : "Send"}
             </Button>
           </DialogFooter>
         </DialogContent>
