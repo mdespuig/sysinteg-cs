@@ -149,7 +149,7 @@ export function NotificationMenu() {
           ) : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[22rem] p-0">
+      <DropdownMenuContent align="end" className="w-88 p-0">
         <div className="flex items-center justify-between gap-3 px-3 py-2">
           <DropdownMenuLabel className="px-0 py-0">Notifications</DropdownMenuLabel>
           <Button
@@ -169,7 +169,7 @@ export function NotificationMenu() {
         </div>
         <DropdownMenuSeparator className="my-0" />
         {hasNotifications ? (
-          <ScrollArea className="max-h-[24rem]">
+          <ScrollArea className="max-h-96">
             <div className="p-1">
               {notifications.map((notification) => {
                 const unread = !notification.readAt
