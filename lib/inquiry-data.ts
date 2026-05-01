@@ -21,7 +21,6 @@ export type InquiryType =
   | "insurance"
   | "general"
   | "complaint"
-  | "feedback"
 
 export const inquiryTypes: { value: InquiryType; label: string; description: string }[] = [
   { value: "appointment", label: "Appointment Inquiry", description: "Schedule, reschedule, or cancel appointments" },
@@ -31,7 +30,6 @@ export const inquiryTypes: { value: InquiryType; label: string; description: str
   { value: "insurance", label: "Insurance & Coverage", description: "Insurance verification and coverage questions" },
   { value: "general", label: "General Inquiry", description: "General questions about services or facilities" },
   { value: "complaint", label: "File a Complaint", description: "Report issues or concerns" },
-  { value: "feedback", label: "Provide Feedback", description: "Share your experience or suggestions" },
 ]
 
 export const relationshipOptions = [

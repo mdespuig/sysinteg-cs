@@ -1,12 +1,14 @@
 {
-  "name": "my-project",
+  "name": "linepoint",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint ."
+    "start": "npm run build && next start",
+    "typecheck": "tsc --noEmit --pretty false",
+    "lint": "tsc --noEmit --pretty false --noUnusedLocals --noUnusedParameters",
+    "prod": "npm run start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
