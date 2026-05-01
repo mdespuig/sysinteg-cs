@@ -137,7 +137,7 @@ export default function LandingPage() {
                   </Button>
                   <Button size="lg" variant="outline" asChild>
                     <Link href="#services">
-                      Main Portal
+                      Subsystems
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>

@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import {
   AlertCircle,
   Camera,
+  ArrowLeft,
   Loader2,
   Save,
   Upload,
@@ -517,9 +518,22 @@ export default function ProfilePage() {
 
       <main className="container mx-auto flex h-[calc(100vh-4rem)] flex-col overflow-hidden px-4 py-4">
         <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
-          <div className="shrink-0 bg-background pb-4 text-center">
-            <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground md:text-3xl">My Profile</h1>
-            <p className="text-muted-foreground">Manage your personal information and emergency contact details.</p>
+          <div className="mb-6 mt-6 flex shrink-0 items-center justify-between">
+            {isPrivilegedUser ? (
+              <Button variant="ghost" asChild className="cursor-pointer">
+                <Link href="/dashboard">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Link>
+              </Button>
+            ) : (
+              <span aria-hidden="true" className="w-21" />
+            )}
+            <div className="flex-1 text-center">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">My Profile</h1>
+              <p className="mt-2 text-muted-foreground">Manage your personal information and emergency contact details.</p>
+            </div>
+            <span aria-hidden="true" className="w-21" />
           </div>
 
           <form onSubmit={handleSubmit} className="min-h-0 flex-1 overflow-y-auto pr-2 pb-4">
@@ -755,17 +769,6 @@ export default function ProfilePage() {
                   </div>
                 </CardContent>
               </Card>
-            )}
-            {isPrivilegedUser && (
-              <div className="mt-6">
-                <Button
-                  type="button"
-                  className="w-full cursor-pointer hover:bg-[#006AEE] hover:text-white"
-                  asChild
-                >
-                  <Link href="/dashboard">Go to Dashboard</Link>
-                </Button>
-              </div>
             )}
           </form>
 
