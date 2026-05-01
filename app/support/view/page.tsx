@@ -510,7 +510,7 @@ export default function ViewInquiriesPage() {
   const ratingReadOnly = Boolean(ratingInquiry?.staffRating)
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen overflow-hidden bg-background">
       <Header />
 
       <main className="container mx-auto flex h-[calc(100vh-4rem)] flex-col overflow-hidden px-4 py-4 md:py-6">
@@ -560,7 +560,7 @@ export default function ViewInquiriesPage() {
           )}
 
           {!loading && !fetchError && (
-            <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[300px_minmax(0,1fr)_300px] lg:items-stretch">
+            <div className="grid min-h-0 flex-1 overflow-hidden gap-6 lg:grid-cols-[300px_minmax(0,1fr)_300px] lg:items-stretch">
               <aside className="space-y-6 overflow-hidden">
                 <Card>
                   <CardHeader>
@@ -679,7 +679,7 @@ export default function ViewInquiriesPage() {
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="min-h-0 flex-1 space-y-4 overflow-y-scroll pr-2 pb-4">
+                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-2 pb-4">
                     {filteredHistory.map((inquiry) => (
                       <div key={inquiry.id} id={`history-${inquiry.id}`} className="scroll-mt-24">
                         <InquiryCard

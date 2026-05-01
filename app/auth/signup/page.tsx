@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { HeartPulse, Loader2 } from "lucide-react"
+import { Eye, EyeOff, HeartPulse, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -22,6 +22,7 @@ export default function SignupPage() {
   const isMountedRef = useRef(true)
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -101,7 +102,7 @@ export default function SignupPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
           <Link href="/" className="mb-6 flex items-center gap-2">
@@ -109,12 +110,12 @@ export default function SignupPage() {
               <HeartPulse className="h-6 w-6 text-primary-foreground" />
             </div>
           </Link>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Create Account</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Linepoint</h1>
           <p className="text-muted-foreground">Sign up to access healthcare services</p>
         </div>
 
         <Card className="border shadow-lg">
-          <CardHeader>
+          <CardHeader className="text-center">
             <CardTitle>Register</CardTitle>
             <CardDescription>
               Fill in your details to create a new account
@@ -160,34 +161,56 @@ export default function SignupPage() {
                 <Label htmlFor="password" className="text-sm font-medium">
                   Password
                 </Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="Create a password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  disabled={isLoading}
-                  required
-                  className="h-10"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Create a password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                    required
+                    className="h-10 pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 flex w-10 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={() => setShowPassword((current) => !current)}
+                    aria-label={showPassword ? "Hide passwords" : "Show passwords"}
+                    disabled={isLoading}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword" className="text-sm font-medium">
                   Confirm Password
                 </Label>
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  placeholder="Confirm your password"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  disabled={isLoading}
-                  required
-                  className="h-10"
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Confirm your password"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                    required
+                    className="h-10 pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 flex w-10 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={() => setShowPassword((current) => !current)}
+                    aria-label={showPassword ? "Hide passwords" : "Show passwords"}
+                    disabled={isLoading}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">

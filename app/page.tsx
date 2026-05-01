@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import {
   HeartPulse,
@@ -20,68 +21,156 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Header } from "@/components/header"
 
+const homepageSections = [
+  { id: "overview", label: "Overview" },
+  { id: "services", label: "Our Systems" },
+  { id: "about", label: "About Linepoint" },
+  { id: "contact", label: "Contact Us" },
+] as const
+
+type HomepageSectionId = (typeof homepageSections)[number]["id"]
+
 export default function LandingPage() {
+  const [activeSection, setActiveSection] = useState<HomepageSectionId>("overview")
+  const scrollContainerRef = useRef<HTMLElement | null>(null)
+  const sectionRefs = useRef<Record<HomepageSectionId, HTMLElement | null>>({
+    overview: null,
+    services: null,
+    about: null,
+    contact: null,
+  })
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
+
+        if (visibleEntry?.target.id) {
+          const nextSection = visibleEntry.target.id as HomepageSectionId
+          setActiveSection(nextSection)
+        }
+      },
+      {
+        root: scrollContainerRef.current,
+        rootMargin: "-20% 0px -30% 0px",
+        threshold: [0.35, 0.6, 0.8],
+      }
+    )
+
+    homepageSections.forEach(({ id }) => {
+      const section = sectionRefs.current[id]
+      if (section) observer.observe(section)
+    })
+
+    return () => observer.disconnect()
+  }, [])
+
+  const setSectionRef = (id: HomepageSectionId) => (node: HTMLElement | null) => {
+    sectionRefs.current[id] = node
+  }
+
+  const contentClass = (id: HomepageSectionId) =>
+    `transition-all duration-700 ease-out ${
+      activeSection === id
+        ? "translate-y-0 opacity-100"
+        : "pointer-events-none translate-y-8 opacity-0"
+    }`
+
+  const scrollToSection = (id: HomepageSectionId) => {
+    sectionRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen overflow-hidden bg-background">
       <Header />
 
-      <section className="relative overflow-hidden border-b">
-        <div aria-hidden="true" className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-accent/5" />
-        <div className="container relative mx-auto px-4 py-20 md:py-28">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-card px-4 py-1.5">
-              <Activity className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium text-foreground">Trusted Healthcare Provider</span>
-            </div>
-            <h1 className="mb-6 text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
-              <span className="text-balance">Your Health, Our Priority</span>
-            </h1>
-            <p className="mb-8 text-lg leading-relaxed text-muted-foreground md:text-xl">
-              Providing comprehensive healthcare services with compassion, expertise, and dedication. 
-              Experience world-class medical care tailored to your needs.
-            </p>
-            <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Button size="lg" asChild>
-                <Link href="/support">
-                  Contact Support
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link href="#services">
-                  Main Portal
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <div className="fixed right-10 top-1/2 z-40 hidden -translate-y-1/2 flex-col items-center gap-3 md:flex">
+        {homepageSections.map((section, index) => (
+          <button
+            key={section.id}
+            type="button"
+            onClick={() => scrollToSection(section.id)}
+            className={`group flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
+              activeSection === section.id ? "bg-[#006AEE]/10" : "bg-transparent hover:bg-[#006AEE]/10"
+            }`}
+            aria-label={`Scroll to ${section.label}`}
+          >
+            <span
+              className={`block rounded-full transition-all ${
+                activeSection === section.id
+                  ? "h-3 w-3 bg-[#006AEE]"
+                  : "h-1 w-4 bg-slate-300 group-hover:bg-[#006AEE]"
+              }`}
+            />
+            <span className="sr-only">{index + 1}</span>
+          </button>
+        ))}
+      </div>
 
-      <section className="border-b bg-card">
-        <div className="container mx-auto px-4 py-12">
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-primary md:text-4xl">25+</p>
-              <p className="mt-1 text-sm text-muted-foreground">Years of Excellence</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-primary md:text-4xl">150+</p>
-              <p className="mt-1 text-sm text-muted-foreground">Expert Doctors</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-primary md:text-4xl">50K+</p>
-              <p className="mt-1 text-sm text-muted-foreground">Patients Served</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-primary md:text-4xl">24/7</p>
-              <p className="mt-1 text-sm text-muted-foreground">Emergency Care</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <main ref={scrollContainerRef} className="h-[calc(100vh-4rem)] snap-y snap-mandatory overflow-y-auto scroll-smooth">
+        <section
+          id="overview"
+          ref={setSectionRef("overview")}
+          className="relative flex min-h-full snap-start snap-always flex-col justify-center overflow-hidden border-b bg-[#F8FFFE]"
+        >
+          <div aria-hidden="true" className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-accent/5" />
+          <div className={`container relative mx-auto px-4 py-12 md:py-16 ${contentClass("overview")}`}>
+              <div className="mx-auto max-w-3xl text-center">
+                <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-card px-4 py-1.5">
+                  <Activity className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-foreground">Trusted Healthcare Provider</span>
+                </div>
+                <h1 className="mb-6 text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
+                  <span className="text-balance">Your Health, Our Priority</span>
+                </h1>
+                <p className="mb-8 text-lg leading-relaxed text-muted-foreground md:text-xl">
+                  Providing comprehensive healthcare services with compassion, expertise, and dedication. 
+                  Experience world-class medical care tailored to your needs.
+                </p>
+                <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+                  <Button size="lg" asChild>
+                    <Link href="/support">
+                      Contact Support
+                    </Link>
+                  </Button>
+                  <Button size="lg" variant="outline" asChild>
+                    <Link href="#services">
+                      Main Portal
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
 
-      <section id="services" className="scroll-mt-16 border-b">
-        <div className="container mx-auto px-4 py-16 md:py-20">
+              <div className="mx-auto mt-14 grid max-w-5xl grid-cols-2 gap-4 rounded-2xl border border-blue-100 bg-[#D2F1FF] p-5 shadow-[0_12px_30px_rgba(59,130,246,0.08)] md:grid-cols-4">
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-primary md:text-4xl">25+</p>
+                  <p className="mt-1 text-sm text-slate-600">Years of Excellence</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-primary md:text-4xl">150+</p>
+                  <p className="mt-1 text-sm text-slate-600">Expert Doctors</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-primary md:text-4xl">50K+</p>
+                  <p className="mt-1 text-sm text-slate-600">Patients Served</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-primary md:text-4xl">24/7</p>
+                  <p className="mt-1 text-sm text-slate-600">Emergency Care</p>
+                </div>
+              </div>
+          </div>
+        </section>
+
+        <section
+          id="services"
+          ref={setSectionRef("services")}
+          className="flex min-h-full snap-start snap-always items-center border-b bg-white"
+        >
+          <div className={`container mx-auto px-4 py-12 md:py-16 ${contentClass("services")}`}>
           <div className="mb-12 text-center">
             <h2 className="mb-4 text-3xl font-bold text-foreground">Our Systems</h2>
             <p className="mx-auto max-w-4xl text-muted-foreground lg:whitespace-nowrap">
@@ -150,11 +239,15 @@ export default function LandingPage() {
               </CardHeader>
             </Card>
           </div>
-        </div>
-      </section>
+          </div>
+        </section>
 
-      <section id="about" className="scroll-mt-16 border-b bg-muted/30">
-        <div className="container mx-auto px-4 py-16 md:py-20">
+        <section
+          id="about"
+          ref={setSectionRef("about")}
+          className="flex min-h-full snap-start snap-always items-center border-b bg-muted/30"
+        >
+          <div className={`container mx-auto px-4 py-12 md:py-16 ${contentClass("about")}`}>
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <div>
               <h2 className="mb-4 text-3xl font-bold text-foreground">About Linepoint</h2>
@@ -210,20 +303,24 @@ export default function LandingPage() {
               </Card>
             </div>
           </div>
-        </div>
-      </section>
+          </div>
+        </section>
 
-      <section id="contact" className="scroll-mt-16 border-b">
-        <div className="container mx-auto px-4 py-16 md:py-20">
+        <section
+          id="contact"
+          ref={setSectionRef("contact")}
+          className="flex min-h-full snap-start snap-always flex-col justify-center border-b bg-white"
+        >
+          <div className={`container mx-auto px-4 py-12 md:py-16 ${contentClass("contact")}`}>
           <div className="mb-12 text-center">
             <h2 className="mb-4 text-3xl font-bold text-foreground">Contact Us</h2>
             <p className="mx-auto max-w-2xl text-muted-foreground">
-              Have questions? Reach out to us through any of the following channels.
+              Do you have any questions? Reach out to us through any of the following channels.
             </p>
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">
-            <Card className="text-center">
+            <Card className="text-center transition-shadow hover:shadow-md">
               <CardContent className="pt-6">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
                   <Phone className="h-6 w-6 text-primary" />
@@ -234,7 +331,7 @@ export default function LandingPage() {
               </CardContent>
             </Card>
 
-            <Card className="text-center">
+            <Card className="text-center transition-shadow hover:shadow-md">
               <CardContent className="pt-6">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
                   <Mail className="h-6 w-6 text-primary" />
@@ -245,7 +342,7 @@ export default function LandingPage() {
               </CardContent>
             </Card>
 
-            <Card className="text-center">
+            <Card className="text-center transition-shadow hover:shadow-md">
               <CardContent className="pt-6">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
                   <MapPin className="h-6 w-6 text-primary" />
@@ -256,29 +353,28 @@ export default function LandingPage() {
               </CardContent>
             </Card>
           </div>
-        </div>
-      </section>
 
-      <footer className="bg-card">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <HeartPulse className="h-4 w-4 text-primary-foreground" />
+          <footer className="mt-10 border-t border-blue-100 pt-6">
+            <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                  <HeartPulse className="h-4 w-4 text-primary-foreground" />
+                </div>
+                <span className="font-semibold text-foreground">Linepoint</span>
               </div>
-              <span className="font-semibold text-foreground">Linepoint</span>
+              <div className="text-center md:text-right">
+                <p className="text-sm text-muted-foreground">
+                  2026 Linepoint. All rights reserved.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Cobilla, Despuig, Esmabe, Mapa | ITMC321 - ZT32
+                </p>
+              </div>
             </div>
-            <div className="text-center md:text-right">
-              <p className="text-sm text-muted-foreground">
-                2026 Linepoint. All rights reserved.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Cobilla, Despuig, Esmabe, Mapa | ITMC321 - ZT32
-              </p>
-            </div>
+          </footer>
           </div>
-        </div>
-      </footer>
+        </section>
+      </main>
     </div>
   )
 }

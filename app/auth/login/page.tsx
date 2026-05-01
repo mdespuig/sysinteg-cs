@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { HeartPulse, Loader2 } from "lucide-react"
+import { Eye, EyeOff, HeartPulse, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,12 +52,12 @@ export default function LoginPage() {
               <HeartPulse className="h-6 w-6 text-primary-foreground" />
             </div>
           </Link>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Welcome Back</h1>
-          <p className="text-muted-foreground">Sign in to access your healthcare account</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Linepoint</h1>
+          <p className="text-muted-foreground">Sign in to access healthcare services</p>
         </div>
 
         <Card className="border shadow-lg">
-          <CardHeader>
+          <CardHeader className="text-center">
             <CardTitle>Login</CardTitle>
             <CardDescription>
               Enter your credentials to access your account
@@ -84,16 +85,27 @@ export default function LoginPage() {
                 <Label htmlFor="password" className="text-sm font-medium">
                   Password
                 </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading}
-                  required
-                  className="h-10"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                    required
+                    className="h-10 pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 flex w-10 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={() => setShowPassword((current) => !current)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    disabled={isLoading}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
 
               <Button
