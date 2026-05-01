@@ -3,11 +3,12 @@ import { getServerSession } from "next-auth"
 import { authConfig } from "@/auth"
 import clientPromise from "@/lib/db"
 import { logAdminActivity } from "@/lib/audit-logs"
-import { createAnnouncementNotifications } from "@/lib/notifications"
+import { createAnnouncementNotifications, type NotificationRole } from "@/lib/notifications"
 
 const DATABASE_NAME = "healthcare"
 const ANNOUNCEMENTS_COLLECTION = "announcements"
 const ANNOUNCEMENT_AUDIENCE_LABELS = {
+  all: "all users",
   standard: "standard users",
   staff: "staff",
 } as const
@@ -85,7 +86,7 @@ export async function createAnnouncement(request: NextRequest) {
       ? body.title.trim().slice(0, 120)
       : "Announcement"
     const message = typeof body.message === "string" ? body.message.trim().slice(0, 500) : ""
-    const targetRole = body.targetRole === "standard" || body.targetRole === "staff"
+    const targetRole = body.targetRole === "all" || body.targetRole === "standard" || body.targetRole === "staff"
       ? body.targetRole as AnnouncementAudience
       : null
 
@@ -101,7 +102,8 @@ export async function createAnnouncement(request: NextRequest) {
     const client = await clientPromise
     const db = client.db(DATABASE_NAME)
     const adminName = auth.session?.user?.name || auth.session?.user?.email || "Admin"
-    const audienceRoles: AnnouncementAudience[] = [targetRole]
+    const audienceRoles: NotificationRole[] =
+      targetRole === "all" ? ["standard", "staff"] : [targetRole]
     const audienceLabel = ANNOUNCEMENT_AUDIENCE_LABELS[targetRole]
 
     const result = await db.collection(ANNOUNCEMENTS_COLLECTION).insertOne({
