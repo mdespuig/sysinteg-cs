@@ -584,7 +584,7 @@ export default function RecordsPage() {
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button onClick={() => loadData()} className="h-10 w-10 cursor-pointer rounded-lg bg-[#006AEE] text-[#F8FFFE] border border-[#006AEE] hover:bg-[#F8FFFE] hover:text-[#006AEE] hover:border-[#006AEE] p-0">
+                      <Button onClick={() => void loadData(true)} className="h-10 w-10 cursor-pointer rounded-lg bg-[#006AEE] text-[#F8FFFE] border border-[#006AEE] hover:bg-[#F8FFFE] hover:text-[#006AEE] hover:border-[#006AEE] p-0">
                         <RefreshCw className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>

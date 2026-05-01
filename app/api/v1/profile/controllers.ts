@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { ObjectId } from "mongodb"
+import { getServerSession } from "next-auth"
+import { authConfig } from "@/auth"
 import clientPromise from "@/lib/db"
 
 const COLLECTION = "profile"
@@ -31,19 +33,30 @@ const normalizePhoneNumber = (value: unknown) => {
   return null
 }
 
+async function requireSessionUser() {
+  const session = await getServerSession(authConfig)
+  const userId = (session?.user as any)?.id as string | undefined
+
+  if (!userId || !isValidObjectId(userId)) {
+    return null
+  }
+
+  return { session, userId }
+}
+
 export async function getProfile(request: NextRequest) {
   try {
-    const userId = request.nextUrl.searchParams.get("userId")
-    if (!userId || !isValidObjectId(userId)) {
-      return NextResponse.json({ error: "Valid userId is required" }, { status: 400 })
+    const auth = await requireSessionUser()
+    if (!auth) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
     const client = await clientPromise
     const db = client.db("healthcare")
     const [profile, user] = await Promise.all([
-      db.collection(COLLECTION).findOne({ userId }),
+      db.collection(COLLECTION).findOne({ userId: auth.userId }),
       db.collection("users").findOne(
-        { _id: new ObjectId(userId) },
+        { _id: new ObjectId(auth.userId) },
         { projection: { email: 1 } }
       ),
     ])
@@ -67,10 +80,14 @@ export async function getProfile(request: NextRequest) {
 
 export async function updateProfile(request: NextRequest) {
   try {
+    const auth = await requireSessionUser()
+    if (!auth) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
     const body = await request.json()
     const {
       userId,
-      isAdmin,
       avatarOnly = false,
       profileImage = null,
       personalData,
@@ -78,11 +95,11 @@ export async function updateProfile(request: NextRequest) {
       cropMode = false,
     } = body
 
-    if (!userId || !isValidObjectId(userId)) {
-      return NextResponse.json({ error: "Valid userId is required" }, { status: 400 })
+    if (userId && userId !== auth.userId) {
+      return NextResponse.json({ error: "You can only update your own profile" }, { status: 403 })
     }
 
-    if (!avatarOnly && !isAdmin && (!personalData || !emergencyContact)) {
+    if (!avatarOnly && (!personalData || !emergencyContact)) {
       return NextResponse.json({ error: "Profile data is required" }, { status: 400 })
     }
 
@@ -90,9 +107,9 @@ export async function updateProfile(request: NextRequest) {
     const db = client.db("healthcare")
     const profiles = db.collection(COLLECTION)
     const [existingProfile, user] = await Promise.all([
-      profiles.findOne({ userId }),
+      profiles.findOne({ userId: auth.userId }),
       db.collection("users").findOne(
-        { _id: new ObjectId(userId) },
+        { _id: new ObjectId(auth.userId) },
         { projection: { email: 1 } }
       ),
     ])
@@ -108,10 +125,10 @@ export async function updateProfile(request: NextRequest) {
 
     if (avatarOnly) {
       await profiles.updateOne(
-        { userId },
+        { userId: auth.userId },
         {
           $set: {
-            userId,
+            userId: auth.userId,
             profileImage,
             email: user?.email ?? existingProfile?.email ?? null,
             updatedAt: now,
@@ -123,7 +140,7 @@ export async function updateProfile(request: NextRequest) {
         { upsert: true }
       )
 
-      const savedProfile = await profiles.findOne({ userId })
+      const savedProfile = await profiles.findOne({ userId: auth.userId })
       return NextResponse.json(
         { message: "Avatar saved successfully", data: savedProfile },
         { status: 200 }
@@ -133,7 +150,7 @@ export async function updateProfile(request: NextRequest) {
     const normalizedPersonalContactNumber = normalizePhoneNumber(personalData?.contactNumber)
     const normalizedEmergencyContactNumber = normalizePhoneNumber(emergencyContact?.contactNumber)
 
-    if (!isAdmin && (!normalizedPersonalContactNumber || !normalizedEmergencyContactNumber)) {
+    if (!normalizedPersonalContactNumber || !normalizedEmergencyContactNumber) {
       return NextResponse.json(
         { error: "Contact numbers must contain exactly 9 digits after +639" },
         { status: 400 }
@@ -141,25 +158,23 @@ export async function updateProfile(request: NextRequest) {
     }
 
     const setData: Record<string, unknown> = {
-      userId,
+      userId: auth.userId,
       profileImage,
       email: user?.email ?? existingProfile?.email ?? null,
       updatedAt: now,
     }
 
-    if (!isAdmin) {
-      setData.personalData = {
-        ...personalData,
-        contactNumber: normalizedPersonalContactNumber,
-      }
-      setData.emergencyContact = {
-        ...emergencyContact,
-        contactNumber: normalizedEmergencyContactNumber,
-      }
+    setData.personalData = {
+      ...personalData,
+      contactNumber: normalizedPersonalContactNumber,
+    }
+    setData.emergencyContact = {
+      ...emergencyContact,
+      contactNumber: normalizedEmergencyContactNumber,
     }
 
     await profiles.updateOne(
-      { userId },
+      { userId: auth.userId },
       {
         $set: setData,
         $setOnInsert: {
@@ -169,7 +184,7 @@ export async function updateProfile(request: NextRequest) {
       { upsert: true }
     )
 
-    const savedProfile = await profiles.findOne({ userId })
+    const savedProfile = await profiles.findOne({ userId: auth.userId })
     return NextResponse.json(
       { message: "Profile saved successfully", data: savedProfile },
       { status: 200 }
