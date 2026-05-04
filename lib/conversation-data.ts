@@ -14,6 +14,7 @@ export interface ConversationMessage {
 export interface AssignedStaffInfo {
   id?: string | null
   name: string
+  username?: string | null
   email?: string | null
   contactNumber?: string | null
   profileImage?: string | null

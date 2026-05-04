@@ -8,6 +8,7 @@ import { HeartPulse, LogOut, User } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { NotificationMenu } from "@/components/notification-menu"
+import { ProfileSetupModal } from "@/components/profile-setup-modal"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
   const isAdmin = role === "admin"
   const showDashboardLink = pathname === "/"
   const [profileImage, setProfileImage] = useState<string | null>(null)
+  const [displayName, setDisplayName] = useState("")
 
   const handleLogout = async () => {
     try {
@@ -56,6 +58,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
     const userId = session?.user?.id
     if (!userId) {
       setProfileImage(null)
+      setDisplayName(session?.user?.name || "")
       return
     }
 
@@ -66,9 +69,21 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
     setProfileImage(cachedImage || null)
 
     const syncAvatar = (event: Event) => {
-      const customEvent = event as CustomEvent<{ userId?: string; profileImage?: string | null }>
+      const customEvent = event as CustomEvent<{
+        userId?: string
+        profileImage?: string | null
+        firstName?: string
+        lastName?: string
+      }>
       if (customEvent.detail?.userId === userId) {
         setProfileImage(customEvent.detail.profileImage ?? null)
+        const nextDisplayName = [customEvent.detail.firstName, customEvent.detail.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim()
+        if (nextDisplayName) {
+          setDisplayName(nextDisplayName)
+        }
       }
     }
 
@@ -85,11 +100,16 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
 
         const data = await response.json()
         const nextImage = response.ok ? data.data?.profileImage ?? null : null
+        const firstName = data.data?.personalData?.firstName?.trim?.() || ""
+        const lastName = data.data?.personalData?.lastName?.trim?.() || ""
+        const nextDisplayName = [firstName, lastName].filter(Boolean).join(" ").trim()
         setProfileImage(nextImage)
+        setDisplayName(nextDisplayName || session?.user?.name || "")
         window.localStorage.setItem(cacheKey, nextImage ?? "")
       } catch (error) {
         if ((error as Error).name === "AbortError") return
         console.error("Failed to load header avatar:", error)
+        setDisplayName(session?.user?.name || "")
       }
     }
 
@@ -100,7 +120,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
       controller.abort()
       window.removeEventListener("profile-avatar-updated", syncAvatar)
     }
-  }, [session?.user?.id])
+  }, [session?.user?.id, session?.user?.name])
 
   useEffect(() => {
     if (!session?.user?.id) return
@@ -143,6 +163,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
   const avatarLetter = session?.user?.name?.[0]?.toUpperCase() || "U"
 
   return (
+    <>
     <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/80">
       <div className="container mx-auto grid h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-4">
         <Link href="/" className="flex items-center gap-2 justify-self-start">
@@ -200,7 +221,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
                       )}
                     </Avatar>
                     <span className="text-sm font-medium text-foreground hidden sm:inline">
-                      {session.user.name}
+                      {displayName || session.user.name}
                     </span>
                   </button>
                 </DropdownMenuTrigger>
@@ -238,5 +259,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
         </div>
       </div>
     </header>
+    <ProfileSetupModal />
+    </>
   )
 }

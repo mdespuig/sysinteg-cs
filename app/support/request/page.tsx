@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import {
-  ArrowLeft,
+  ChevronLeft,
   Send,
   CheckCircle,
   User,
@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Header } from "@/components/header"
+import { AnimatedError } from "@/components/ui/animated-error"
 import { inquiryTypes, relationshipOptions, type InquiryType } from "@/lib/inquiry-data"
 import { toast } from "sonner"
 
@@ -361,23 +362,20 @@ export default function RequestInquiryPage() {
       <main className="container mx-auto flex h-[calc(100vh-4rem)] flex-col overflow-hidden px-4 py-4">
         <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
           <div className="shrink-0 bg-background pb-4">
-          <div className="mb-3 flex justify-start">
-            <Button variant="ghost" asChild className="px-0">
-              <Link href="/support">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Support
-              </Link>
-            </Button>
-          </div>
-
-          <div className="text-center">
-            <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-              Submit an Inquiry
-            </h1>
-            <p className="text-muted-foreground">
+            <div className="mb-2 grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center">
+              <Button variant="ghost" asChild className="h-10 w-10 cursor-pointer justify-self-start p-0">
+                <Link href="/support" aria-label="Back">
+                  <ChevronLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+              <h1 className="text-center text-2xl font-bold tracking-tight text-foreground md:text-3xl">
+                Submit an Inquiry
+              </h1>
+              <span aria-hidden="true" className="h-10 w-10" />
+            </div>
+            <p className="text-center text-muted-foreground">
               Fill out the form below and our team will get back to you within 24-48 hours.
             </p>
-          </div>
           </div>
 
           <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -414,9 +412,7 @@ export default function RequestInquiryPage() {
                   {selectedInquiryType && (
                     <p className="text-sm text-muted-foreground">{selectedInquiryType.description}</p>
                   )}
-                  {errors.inquiryType && (
-                    <p className="text-sm text-destructive">{errors.inquiryType}</p>
-                  )}
+                  <AnimatedError message={errors.inquiryType} className="text-sm text-destructive" />
                 </div>
 
                 <div className="space-y-2">
@@ -431,9 +427,7 @@ export default function RequestInquiryPage() {
                     onChange={(e) => updateField("patientName", e.target.value)}
                     className={errors.patientName ? "border-destructive" : ""}
                   />
-                  {errors.patientName && (
-                    <p className="text-sm text-destructive">{errors.patientName}</p>
-                  )}
+                  <AnimatedError message={errors.patientName} className="text-sm text-destructive" />
                 </div>
 
                 <div className="rounded-lg border bg-muted/30 p-4">
@@ -489,9 +483,7 @@ export default function RequestInquiryPage() {
                         className={`pl-20 ${errors.contactNumber ? "border-destructive" : ""}`}
                       />
                     </div>
-                    {errors.contactNumber && (
-                      <p className="text-sm text-destructive">{errors.contactNumber}</p>
-                    )}
+                    <AnimatedError message={errors.contactNumber} className="text-sm text-destructive" />
                   </div>
 
                   <div className="space-y-2">
@@ -508,9 +500,7 @@ export default function RequestInquiryPage() {
                       disabled={fillInformationFields || isLoadingProfileInfo}
                       className={errors.email ? "border-destructive" : ""}
                     />
-                    {errors.email && (
-                      <p className="text-sm text-destructive">{errors.email}</p>
-                    )}
+                    <AnimatedError message={errors.email} className="text-sm text-destructive" />
                   </div>
                 </div>
 
@@ -527,9 +517,7 @@ export default function RequestInquiryPage() {
                     disabled={fillInformationFields || isLoadingProfileInfo}
                     className={errors.address ? "border-destructive" : ""}
                   />
-                  {errors.address && (
-                    <p className="text-sm text-destructive">{errors.address}</p>
-                  )}
+                  <AnimatedError message={errors.address} className="text-sm text-destructive" />
                 </div>
 
                 <div className="space-y-2">
@@ -552,9 +540,7 @@ export default function RequestInquiryPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.relationship && (
-                    <p className="text-sm text-destructive">{errors.relationship}</p>
-                  )}
+                  <AnimatedError message={errors.relationship} className="text-sm text-destructive" />
                 </div>
 
                 <div className="space-y-2">
@@ -570,9 +556,7 @@ export default function RequestInquiryPage() {
                     onChange={(e) => updateField("details", e.target.value)}
                     className={errors.details ? "border-destructive" : ""}
                   />
-                  {errors.details && (
-                    <p className="text-sm text-destructive">{errors.details}</p>
-                  )}
+                  <AnimatedError message={errors.details} className="text-sm text-destructive" />
                 </div>
 
                 <div className="flex gap-4 pt-4">

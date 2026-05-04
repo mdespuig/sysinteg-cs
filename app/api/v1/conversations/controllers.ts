@@ -80,6 +80,14 @@ async function getUserProfile(db: any, userId?: string | null) {
   return db.collection(PROFILE_COLLECTION).findOne({ userId })
 }
 
+function buildPreferredName(profile: any, user: any, fallback: string) {
+  const firstName = String(profile?.personalData?.firstName || "").trim()
+  const lastName = String(profile?.personalData?.lastName || "").trim()
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim()
+  if (fullName) return fullName
+  return user?.username || user?.email || fallback
+}
+
 async function getConversationInquiryForUser(db: any, inquiryId: string, userId: string, role: string) {
   if (!inquiryId) return null
 
@@ -115,7 +123,8 @@ async function resolveInquiryUser(db: any, inquiry: any): Promise<AssignedStaffI
       const profile = await getUserProfile(db, user._id.toString())
       return {
         id: user._id.toString(),
-        name: user.username || user.email || inquiry.patientName || "Inquiry User",
+        name: buildPreferredName(profile, user, inquiry.patientName || "Inquiry User"),
+        username: user.username || null,
         email: profile?.email || user.email || inquiry.email || null,
         contactNumber: profile?.personalData?.contactNumber || user.contactNumber || inquiry.contactNumber || null,
         profileImage: profile?.profileImage || user.profileImage || null,
@@ -129,6 +138,7 @@ async function resolveInquiryUser(db: any, inquiry: any): Promise<AssignedStaffI
   return {
     id: inquiryUserId || null,
     name: inquiry.patientName || inquiry.email || "Inquiry User",
+    username: null,
     email: inquiry.email || null,
     contactNumber: inquiry.contactNumber || null,
     profileImage: null,
@@ -153,7 +163,8 @@ async function resolveAssignedStaff(db: any, inquiry: any): Promise<AssignedStaf
       const profile = await getUserProfile(db, staff._id.toString())
       return {
         id: staff._id.toString(),
-        name: staff.username || staff.email || "Assigned Staff",
+        name: buildPreferredName(profile, staff, "Assigned Staff"),
+        username: staff.username || null,
         email: profile?.email || staff.email || null,
         contactNumber: profile?.personalData?.contactNumber || staff.contactNumber || null,
         profileImage: profile?.profileImage || staff.profileImage || null,
@@ -168,6 +179,7 @@ async function resolveAssignedStaff(db: any, inquiry: any): Promise<AssignedStaf
     return {
       id: null,
       name: assignedStaffName,
+      username: null,
       email: null,
       contactNumber: null,
       profileImage: null,
@@ -180,6 +192,7 @@ async function resolveAssignedStaff(db: any, inquiry: any): Promise<AssignedStaf
   return {
     id: null,
     name: "Unassigned Staff",
+    username: null,
     email: null,
     contactNumber: null,
     profileImage: null,
@@ -240,6 +253,34 @@ export async function getConversation(request: NextRequest) {
       .sort({ createdAt: 1 })
       .toArray()
 
+    const senderIds = Array.from(
+      new Set(
+        messages
+          .map((message: any) => String(message.senderId || "").trim())
+          .filter((senderId: string) => senderId.length > 0)
+      )
+    )
+    const senderUsers = senderIds.length
+      ? await db
+          .collection(USERS_COLLECTION)
+          .find(
+            { _id: { $in: senderIds.filter(ObjectId.isValid).map((id) => new ObjectId(id)) } },
+            { projection: { username: 1, email: 1 } }
+          )
+          .toArray()
+      : []
+    const senderProfiles = senderIds.length
+      ? await db
+          .collection(PROFILE_COLLECTION)
+          .find(
+            { userId: { $in: senderIds } },
+            { projection: { userId: 1, "personalData.firstName": 1, "personalData.lastName": 1 } }
+          )
+          .toArray()
+      : []
+    const userById = new Map(senderUsers.map((user: any) => [String(user._id), user]))
+    const profileByUserId = new Map(senderProfiles.map((profile: any) => [String(profile.userId), profile]))
+
     const assignedStaff = await resolveAssignedStaff(db, inquiry)
     const inquiryUser = await resolveInquiryUser(db, inquiry)
     const staffRating = await db.collection(STAFF_RATINGS_COLLECTION).findOne({ inquiryId: inquiry.id })
@@ -292,10 +333,16 @@ export async function getConversation(request: NextRequest) {
           typing: {
             isPeerTyping,
           },
-          messages: messages.map((message: any) => ({
-            ...message,
-            _id: message._id.toString(),
-          })),
+          messages: messages.map((message: any) => {
+            const senderId = String(message.senderId || "")
+            const senderUser = userById.get(senderId)
+            const senderProfile = profileByUserId.get(senderId)
+            return {
+              ...message,
+              _id: message._id.toString(),
+              senderName: buildPreferredName(senderProfile, senderUser, message.senderName || "User"),
+            }
+          }),
         },
       },
       { status: 200 }

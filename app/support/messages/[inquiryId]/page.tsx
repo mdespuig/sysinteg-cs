@@ -5,7 +5,7 @@ import Link from "next/link"
 import { redirect, useParams, useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import {
-  ArrowLeft,
+  ChevronLeft,
   ChevronDown,
   ChevronUp,
   Clock3,
@@ -883,8 +883,29 @@ export default function InquiryMessagesPage() {
     return (
       <div className="min-h-screen bg-white">
         <Header />
-        <main className="flex h-[calc(100vh-4rem)] items-center justify-center text-sm text-slate-500">
-          Loading conversation...
+        <main className="h-[calc(100vh-4rem)] p-4">
+          <div className="grid h-full animate-pulse grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <section className="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white">
+              <div className="h-12 shrink-0 border-b border-slate-200 px-3 py-2">
+                <div className="h-7 w-40 rounded bg-slate-200/80" />
+              </div>
+              <div className="min-h-0 flex-1 space-y-4 px-5 py-6">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={index} className={`flex ${index % 2 === 0 ? "justify-start" : "justify-end"}`}>
+                    <div className="h-12 w-2/3 rounded-xl bg-slate-200/70" />
+                  </div>
+                ))}
+              </div>
+              <div className="h-16 shrink-0 border-t border-slate-200 px-4 py-3">
+                <div className="h-10 w-full rounded bg-slate-200/80" />
+              </div>
+            </section>
+            <aside className="hidden rounded-xl border border-slate-200 bg-white p-4 lg:block">
+              <div className="mb-4 h-20 rounded bg-slate-200/80" />
+              <div className="mb-4 h-28 rounded bg-slate-200/70" />
+              <div className="h-28 rounded bg-slate-200/70" />
+            </aside>
+          </div>
         </main>
       </div>
     )
@@ -901,9 +922,8 @@ export default function InquiryMessagesPage() {
           <h1 className="text-2xl font-semibold text-slate-950">Conversation unavailable</h1>
           <p className="mt-2 text-sm text-slate-500">{error}</p>
           <Button asChild className="mt-6 cursor-pointer">
-            <Link href={backHref}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Inquiries
+            <Link href={backHref} aria-label="Back">
+              <ChevronLeft className="h-4 w-4" />
             </Link>
           </Button>
         </main>
@@ -921,7 +941,7 @@ export default function InquiryMessagesPage() {
               <div className="relative flex h-12 shrink-0 items-center border-b border-slate-200 px-3">
                 <Button asChild size="icon" className="h-8 w-8 cursor-pointer rounded-md bg-transparent text-slate-500 hover:bg-[#006AEE] hover:text-white">
                   <Link href="/dashboard/records" aria-label="Back to inquiries">
-                    <ArrowLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-4 w-4" />
                   </Link>
                 </Button>
                 <h1 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-bold">
@@ -1124,7 +1144,7 @@ export default function InquiryMessagesPage() {
               <div className="flex min-w-0 items-center gap-3">
                 <Button variant="ghost" size="icon" asChild className="mr-1 h-9 w-9 shrink-0 cursor-pointer">
                   <Link href={backHref} aria-label="Back">
-                    <ArrowLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-4 w-4" />
                   </Link>
                 </Button>
                 <Avatar className="h-10 w-10">
@@ -1756,7 +1776,7 @@ function ConversationMediaDialogs({
             <DialogDescription className="text-sm text-slate-500">Image Preview</DialogDescription>
           </DialogHeader>
           {imagePreview ? (
-            <Button asChild size="icon" className="absolute right-14 top-6 z-10 h-10 w-10 cursor-pointer rounded-lg bg-[#006AEE] text-white hover:bg-[#0054BB]">
+            <Button asChild size="icon" className="absolute right-14 top-6 z-10 h-10 w-10 cursor-pointer rounded-lg bg-transparent text-[#006AEE] hover:bg-[#006AEE] hover:text-white">
               <a href={imagePreview.url} download={imagePreview.name} aria-label="Download image">
                 <Download className="h-4 w-4" />
               </a>
@@ -1950,7 +1970,12 @@ function ParticipantInfoPanel({
         <ParticipantAvatar participant={participant} fallbackColor={fallbackColor} size="small" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold text-slate-950">{name}</p>
-          <p className="text-xs text-slate-500">{participant?.statusText || "Offline"}</p>
+          <p className="truncate text-xs font-normal text-slate-700">
+            {participant?.username || "No username"}
+          </p>
+          <p className="text-xs font-normal text-slate-500">
+            {participant?.statusText || "Offline"}
+          </p>
         </div>
       </div>
       <div className="mt-4 space-y-3">

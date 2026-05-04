@@ -8,7 +8,7 @@ import { toast } from "sonner"
 import {
   AlertCircle,
   Camera,
-  ArrowLeft,
+  ChevronLeft,
   Loader2,
   Save,
   Upload,
@@ -20,11 +20,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { AnimatedError } from "@/components/ui/animated-error"
 
 interface PersonalData {
   firstName: string
   lastName: string
+  gender: string
   birthdate: string
   contactNumber: string
   address: string
@@ -66,6 +69,15 @@ const extractPhoneDigits = (value: string) => {
 }
 
 const isCompletePhoneDigits = (value: string) => /^\d{9}$/.test(value)
+const toCapitalizedName = (value: string) => {
+  if (!value) return ""
+  return value
+    .split(" ")
+    .map((part) =>
+      part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : part
+    )
+    .join(" ")
+}
 
 const createDefaultAvatarDataUrl = (label: string) => {
   const initial = (label.trim().charAt(0).toUpperCase() || "U").replace(/&/g, "&amp;")
@@ -91,6 +103,7 @@ const normalizeProfileData = (profile?: Partial<ProfileData> | null): ProfileDat
   personalData: {
     firstName: profile?.personalData?.firstName ?? "",
     lastName: profile?.personalData?.lastName ?? "",
+    gender: profile?.personalData?.gender ?? "",
     birthdate: profile?.personalData?.birthdate ?? "",
     contactNumber: extractPhoneDigits(profile?.personalData?.contactNumber ?? ""),
     address: profile?.personalData?.address ?? "",
@@ -109,6 +122,8 @@ export default function ProfilePage() {
   const role = (session?.user as any)?.role
   const isPrivilegedUser = role === "admin" || role === "staff"
   const isAdmin = role === "admin"
+  const isStaff = role === "staff"
+  const showEmergencyContact = !isAdmin && !isStaff
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingAvatar, setIsSavingAvatar] = useState(false)
@@ -120,6 +135,7 @@ export default function ProfilePage() {
     personalData: {
       firstName: "",
       lastName: "",
+      gender: "",
       birthdate: "",
       contactNumber: "",
       address: "",
@@ -236,9 +252,11 @@ export default function ProfilePage() {
   }
 
   const updatePersonalData = (field: keyof PersonalData, value: string) => {
+    const nextValue =
+      field === "firstName" || field === "lastName" ? toCapitalizedName(value) : value
     setProfileData((prev) => ({
       ...prev,
-      personalData: { ...prev.personalData, [field]: value },
+      personalData: { ...prev.personalData, [field]: nextValue },
     }))
     if (errors.personalData[field]) {
       setErrors((prev) => ({
@@ -249,9 +267,11 @@ export default function ProfilePage() {
   }
 
   const updateEmergencyContact = (field: keyof EmergencyContact, value: string) => {
+    const nextValue =
+      field === "firstName" || field === "lastName" ? toCapitalizedName(value) : value
     setProfileData((prev) => ({
       ...prev,
-      emergencyContact: { ...prev.emergencyContact, [field]: value },
+      emergencyContact: { ...prev.emergencyContact, [field]: nextValue },
     }))
     if (errors.emergencyContact[field]) {
       setErrors((prev) => ({
@@ -374,6 +394,7 @@ export default function ProfilePage() {
 
     if (!profileData.personalData.firstName.trim()) newErrors.personalData.firstName = "First name is required"
     if (!profileData.personalData.lastName.trim()) newErrors.personalData.lastName = "Last name is required"
+    if (!profileData.personalData.gender.trim()) newErrors.personalData.gender = "Gender is required"
     if (!profileData.personalData.birthdate) newErrors.personalData.birthdate = "Birthdate is required"
     if (!profileData.personalData.contactNumber.trim()) {
       newErrors.personalData.contactNumber = "Contact number is required"
@@ -383,24 +404,26 @@ export default function ProfilePage() {
     }
     if (!profileData.personalData.address.trim()) newErrors.personalData.address = "Address is required"
 
-    if (!profileData.emergencyContact.firstName.trim()) newErrors.emergencyContact.firstName = "First name is required"
-    if (!profileData.emergencyContact.lastName.trim()) newErrors.emergencyContact.lastName = "Last name is required"
-    if (!profileData.emergencyContact.contactNumber.trim()) {
-      newErrors.emergencyContact.contactNumber = "Contact number is required"
-    } else if (!isCompletePhoneDigits(profileData.emergencyContact.contactNumber)) {
-      newErrors.emergencyContact.contactNumber = "Contact number must contain exactly 9 digits after +639"
-      phoneErrorMessage = "Contact number must contain exactly 9 digits after +639"
-    }
-    if (!profileData.emergencyContact.address.trim()) newErrors.emergencyContact.address = "Address is required"
+    if (showEmergencyContact) {
+      if (!profileData.emergencyContact.firstName.trim()) newErrors.emergencyContact.firstName = "First name is required"
+      if (!profileData.emergencyContact.lastName.trim()) newErrors.emergencyContact.lastName = "Last name is required"
+      if (!profileData.emergencyContact.contactNumber.trim()) {
+        newErrors.emergencyContact.contactNumber = "Contact number is required"
+      } else if (!isCompletePhoneDigits(profileData.emergencyContact.contactNumber)) {
+        newErrors.emergencyContact.contactNumber = "Contact number must contain exactly 9 digits after +639"
+        phoneErrorMessage = "Contact number must contain exactly 9 digits after +639"
+      }
+      if (!profileData.emergencyContact.address.trim()) newErrors.emergencyContact.address = "Address is required"
 
-    if (
-      isCompletePhoneDigits(profileData.personalData.contactNumber) &&
-      isCompletePhoneDigits(profileData.emergencyContact.contactNumber) &&
-      profileData.personalData.contactNumber === profileData.emergencyContact.contactNumber
-    ) {
-      newErrors.personalData.contactNumber = DUPLICATE_CONTACT_ERROR
-      newErrors.emergencyContact.contactNumber = DUPLICATE_CONTACT_ERROR
-      phoneErrorMessage = DUPLICATE_CONTACT_ERROR
+      if (
+        isCompletePhoneDigits(profileData.personalData.contactNumber) &&
+        isCompletePhoneDigits(profileData.emergencyContact.contactNumber) &&
+        profileData.personalData.contactNumber === profileData.emergencyContact.contactNumber
+      ) {
+        newErrors.personalData.contactNumber = DUPLICATE_CONTACT_ERROR
+        newErrors.emergencyContact.contactNumber = DUPLICATE_CONTACT_ERROR
+        phoneErrorMessage = DUPLICATE_CONTACT_ERROR
+      }
     }
 
     setErrors(newErrors)
@@ -417,16 +440,18 @@ export default function ProfilePage() {
     setIsSaving(true)
 
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         profileImage: profileData.profileImage,
         personalData: {
           ...profileData.personalData,
           contactNumber: `${PHONE_PREFIX}${profileData.personalData.contactNumber}`,
         },
-        emergencyContact: {
+      }
+      if (showEmergencyContact) {
+        payload.emergencyContact = {
           ...profileData.emergencyContact,
           contactNumber: `${PHONE_PREFIX}${profileData.emergencyContact.contactNumber}`,
-        },
+        }
       }
 
       const response = await fetch("/api/v1/profile", {
@@ -518,9 +543,8 @@ export default function ProfilePage() {
           <div className="mb-6 mt-6 flex shrink-0 items-center justify-between">
             {isPrivilegedUser ? (
               <Button variant="ghost" asChild className="cursor-pointer">
-                <Link href="/dashboard">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
+                <Link href="/dashboard" aria-label="Back">
+                  <ChevronLeft className="h-4 w-4" />
                 </Link>
               </Button>
             ) : (
@@ -606,10 +630,10 @@ export default function ProfilePage() {
                     </Button>
                     <p className="text-xs text-muted-foreground">JPG or PNG, max 5MB</p>
                     {imageError && (
-                      <p className="flex items-center gap-1 text-sm text-destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        {imageError}
-                      </p>
+                      <div className="flex items-center gap-1">
+                        <AlertCircle className="h-4 w-4 text-destructive" />
+                        <AnimatedError message={imageError} className="text-sm text-destructive" />
+                      </div>
                     )}
                   </div>
                 </div>
@@ -623,7 +647,11 @@ export default function ProfilePage() {
                     <User className="h-5 w-5 text-primary" />
                     Personal Information
                   </CardTitle>
-                  <CardDescription>Update your personal details and emergency contact information.</CardDescription>
+                  <CardDescription>
+                    {showEmergencyContact
+                      ? "Update your personal details and emergency contact information."
+                      : "Update your personal details."}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8">
                   <div className="space-y-4">
@@ -635,17 +663,36 @@ export default function ProfilePage() {
                       <div className="space-y-2">
                         <Label htmlFor="personal-first-name">First Name</Label>
                         <Input id="personal-first-name" placeholder="Enter first name" value={profileData.personalData.firstName} onChange={(e) => updatePersonalData("firstName", e.target.value)} className={errors.personalData.firstName ? "border-destructive" : ""} />
-                        {errors.personalData.firstName && <p className="text-sm text-destructive">{errors.personalData.firstName}</p>}
+                        <AnimatedError message={errors.personalData.firstName} className="text-sm text-destructive" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="personal-last-name">Last Name</Label>
                         <Input id="personal-last-name" placeholder="Enter last name" value={profileData.personalData.lastName} onChange={(e) => updatePersonalData("lastName", e.target.value)} className={errors.personalData.lastName ? "border-destructive" : ""} />
-                        {errors.personalData.lastName && <p className="text-sm text-destructive">{errors.personalData.lastName}</p>}
+                        <AnimatedError message={errors.personalData.lastName} className="text-sm text-destructive" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="personal-gender">Gender</Label>
+                        <Select value={profileData.personalData.gender} onValueChange={(value) => updatePersonalData("gender", value)}>
+                          <SelectTrigger
+                            id="personal-gender"
+                            className={`h-10 w-full rounded-lg border-input bg-background px-3 text-sm shadow-none ${
+                              errors.personalData.gender ? "border-destructive" : ""
+                            }`}
+                          >
+                            <SelectValue placeholder="Select gender" className="text-foreground" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Male">Male</SelectItem>
+                            <SelectItem value="Female">Female</SelectItem>
+                            <SelectItem value="Prefer not to say">Prefer not to say</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <AnimatedError message={errors.personalData.gender} className="text-sm text-destructive" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="birthdate">Birthdate</Label>
                         <Input id="birthdate" type="date" value={profileData.personalData.birthdate} onChange={(e) => updatePersonalData("birthdate", e.target.value)} className={errors.personalData.birthdate ? "border-destructive" : ""} />
-                        {errors.personalData.birthdate && <p className="text-sm text-destructive">{errors.personalData.birthdate}</p>}
+                        <AnimatedError message={errors.personalData.birthdate} className="text-sm text-destructive" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="personal-contact">Contact Number</Label>
@@ -667,16 +714,18 @@ export default function ProfilePage() {
                             className={`pl-20 ${errors.personalData.contactNumber ? "border-destructive" : ""}`}
                           />
                         </div>
-                        {errors.personalData.contactNumber && <p className="text-sm text-destructive">{errors.personalData.contactNumber}</p>}
+                        <AnimatedError message={errors.personalData.contactNumber} className="text-sm text-destructive" />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="personal-address">Address</Label>
                       <Input id="personal-address" placeholder="Enter complete address" value={profileData.personalData.address} onChange={(e) => updatePersonalData("address", e.target.value)} className={errors.personalData.address ? "border-destructive" : ""} />
-                      {errors.personalData.address && <p className="text-sm text-destructive">{errors.personalData.address}</p>}
+                      <AnimatedError message={errors.personalData.address} className="text-sm text-destructive" />
                     </div>
                   </div>
 
+                  {showEmergencyContact && (
+                    <>
                   <Separator />
 
                   <div className="space-y-4">
@@ -689,12 +738,12 @@ export default function ProfilePage() {
                       <div className="space-y-2">
                         <Label htmlFor="emergency-first-name">First Name</Label>
                         <Input id="emergency-first-name" placeholder="Enter first name" value={profileData.emergencyContact.firstName} onChange={(e) => updateEmergencyContact("firstName", e.target.value)} className={errors.emergencyContact.firstName ? "border-destructive" : ""} />
-                        {errors.emergencyContact.firstName && <p className="text-sm text-destructive">{errors.emergencyContact.firstName}</p>}
+                        <AnimatedError message={errors.emergencyContact.firstName} className="text-sm text-destructive" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="emergency-last-name">Last Name</Label>
                         <Input id="emergency-last-name" placeholder="Enter last name" value={profileData.emergencyContact.lastName} onChange={(e) => updateEmergencyContact("lastName", e.target.value)} className={errors.emergencyContact.lastName ? "border-destructive" : ""} />
-                        {errors.emergencyContact.lastName && <p className="text-sm text-destructive">{errors.emergencyContact.lastName}</p>}
+                        <AnimatedError message={errors.emergencyContact.lastName} className="text-sm text-destructive" />
                       </div>
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="emergency-contact">Contact Number</Label>
@@ -716,7 +765,7 @@ export default function ProfilePage() {
                             className={`pl-20 ${errors.emergencyContact.contactNumber ? "border-destructive" : ""}`}
                           />
                         </div>
-                        {errors.emergencyContact.contactNumber && <p className="text-sm text-destructive">{errors.emergencyContact.contactNumber}</p>}
+                        <AnimatedError message={errors.emergencyContact.contactNumber} className="text-sm text-destructive" />
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -728,11 +777,11 @@ export default function ProfilePage() {
                         onChange={(e) => updateEmergencyContact("address", e.target.value)}
                         className={errors.emergencyContact.address ? "border-destructive" : ""}
                       />
-                      {errors.emergencyContact.address && (
-                        <p className="text-sm text-destructive">{errors.emergencyContact.address}</p>
-                      )}
+                      <AnimatedError message={errors.emergencyContact.address} className="text-sm text-destructive" />
                     </div>
                   </div>
+                    </>
+                  )}
 
                   <div className="pt-4">
                     <Button
@@ -774,3 +823,4 @@ export default function ProfilePage() {
     </div>
   )
 }
+

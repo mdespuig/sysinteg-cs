@@ -44,7 +44,7 @@ async function requireSessionUser() {
   return { session, userId }
 }
 
-export async function getProfile(request: NextRequest) {
+export async function getProfile() {
   try {
     const auth = await requireSessionUser()
     if (!auth) {
@@ -84,6 +84,8 @@ export async function updateProfile(request: NextRequest) {
     if (!auth) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
+    const role = ((auth.session?.user as any)?.role || "") as string
+    const isStaff = role === "staff"
 
     const body = await request.json()
     const {
@@ -99,7 +101,7 @@ export async function updateProfile(request: NextRequest) {
       return NextResponse.json({ error: "You can only update your own profile" }, { status: 403 })
     }
 
-    if (!avatarOnly && (!personalData || !emergencyContact)) {
+    if (!avatarOnly && (!personalData || (!isStaff && !emergencyContact))) {
       return NextResponse.json({ error: "Profile data is required" }, { status: 400 })
     }
 
@@ -148,9 +150,11 @@ export async function updateProfile(request: NextRequest) {
     }
 
     const normalizedPersonalContactNumber = normalizePhoneNumber(personalData?.contactNumber)
-    const normalizedEmergencyContactNumber = normalizePhoneNumber(emergencyContact?.contactNumber)
+    const normalizedEmergencyContactNumber = isStaff
+      ? null
+      : normalizePhoneNumber(emergencyContact?.contactNumber)
 
-    if (!normalizedPersonalContactNumber || !normalizedEmergencyContactNumber) {
+    if (!normalizedPersonalContactNumber || (!isStaff && !normalizedEmergencyContactNumber)) {
       return NextResponse.json(
         { error: "Contact numbers must contain exactly 9 digits after +639" },
         { status: 400 }
@@ -168,15 +172,18 @@ export async function updateProfile(request: NextRequest) {
       ...personalData,
       contactNumber: normalizedPersonalContactNumber,
     }
-    setData.emergencyContact = {
-      ...emergencyContact,
-      contactNumber: normalizedEmergencyContactNumber,
+    if (!isStaff && normalizedEmergencyContactNumber) {
+      setData.emergencyContact = {
+        ...emergencyContact,
+        contactNumber: normalizedEmergencyContactNumber,
+      }
     }
 
     await profiles.updateOne(
       { userId: auth.userId },
       {
         $set: setData,
+        ...(isStaff ? { $unset: { emergencyContact: "" } } : {}),
         $setOnInsert: {
           createdAt: now,
         },

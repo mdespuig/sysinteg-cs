@@ -61,7 +61,7 @@ export default function SupportPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <Card className="group relative flex h-full flex-col overflow-hidden transition-all hover:border-primary hover:shadow-lg">
               <div className="absolute right-0 top-0 h-18 w-18 translate-x-5 -translate-y-5 rounded-full bg-primary/10 transition-transform group-hover:scale-150" />
-              <CardHeader className="relative pb-2">
+              <CardHeader className="relative min-h-[10.5rem] pb-2">
                 <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 transition-colors group-hover:bg-primary/20">
                   <FilePlus className="h-5 w-5 text-primary" />
                 </div>
@@ -72,21 +72,21 @@ export default function SupportPage() {
               </CardHeader>
               <CardContent className="relative flex flex-1 flex-col pt-0">
                 <ul className="mb-3 space-y-1.5 text-xs text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <ClipboardList className="h-3.5 w-3.5 text-primary" />
-                    Schedule or manage appointments
+                  <li className="flex items-start gap-2">
+                    <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span>Schedule or manage appointments</span>
                   </li>
-                  <li className="flex items-center gap-2">
-                    <ClipboardList className="h-3.5 w-3.5 text-primary" />
-                    Billing and payment questions
+                  <li className="flex items-start gap-2">
+                    <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span>Billing and payment questions</span>
                   </li>
-                  <li className="flex items-center gap-2">
-                    <ClipboardList className="h-3.5 w-3.5 text-primary" />
-                    Request medical records
+                  <li className="flex items-start gap-2">
+                    <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span>Request medical records</span>
                   </li>
-                  <li className="flex items-center gap-2">
-                    <ClipboardList className="h-3.5 w-3.5 text-primary" />
-                    Prescription refills
+                  <li className="flex items-start gap-2">
+                    <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span>Prescription refills</span>
                   </li>
                 </ul>
                 <Button className="mt-auto h-9 w-full cursor-pointer" asChild>
@@ -97,7 +97,7 @@ export default function SupportPage() {
 
             <Card className="group relative flex h-full flex-col overflow-hidden transition-all hover:border-accent hover:shadow-lg">
               <div className="absolute right-0 top-0 h-18 w-18 translate-x-5 -translate-y-5 rounded-full bg-accent/10 transition-transform group-hover:scale-150" />
-              <CardHeader className="relative pb-2">
+              <CardHeader className="relative min-h-[10.5rem] pb-2">
                 <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 transition-colors group-hover:bg-accent/20">
                   <Search className="h-5 w-5 text-accent" />
                 </div>
@@ -108,21 +108,21 @@ export default function SupportPage() {
               </CardHeader>
               <CardContent className="relative flex flex-1 flex-col pt-0">
                 <ul className="mb-3 space-y-1.5 text-xs text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <FileSearch className="h-3.5 w-3.5 text-accent" />
-                    Search by inquiry ID
+                  <li className="flex items-start gap-2">
+                    <FileSearch className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
+                    <span>Search by inquiry ID</span>
                   </li>
-                  <li className="flex items-center gap-2">
-                    <FileSearch className="h-3.5 w-3.5 text-accent" />
-                    Track inquiry status
+                  <li className="flex items-start gap-2">
+                    <FileSearch className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
+                    <span>Track inquiry status</span>
                   </li>
-                  <li className="flex items-center gap-2">
-                    <FileSearch className="h-3.5 w-3.5 text-accent" />
-                    View inquiry history
+                  <li className="flex items-start gap-2">
+                    <FileSearch className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
+                    <span>View inquiry history</span>
                   </li>
-                  <li className="flex items-center gap-2">
-                    <FileSearch className="h-3.5 w-3.5 text-accent" />
-                    See response details
+                  <li className="flex items-start gap-2">
+                    <FileSearch className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
+                    <span>See response details</span>
                   </li>
                 </ul>
                 <Button className="mt-auto h-9 w-full cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90" asChild>
