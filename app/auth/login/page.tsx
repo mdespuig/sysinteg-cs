@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getSession, signIn } from "next-auth/react"
 import { Eye, EyeOff, HeartPulse, Loader2 } from "lucide-react"
@@ -17,6 +17,26 @@ export default function LoginPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+
+  useEffect(() => {
+    const rawToast = window.sessionStorage.getItem("auth-toast")
+    if (!rawToast) return
+
+    window.sessionStorage.removeItem("auth-toast")
+
+    try {
+      const parsed = JSON.parse(rawToast) as { type?: "success" | "error"; message?: string }
+      if (parsed.message) {
+        if (parsed.type === "error") {
+          toast.error(parsed.message)
+        } else {
+          toast.success(parsed.message)
+        }
+      }
+    } catch {
+      window.sessionStorage.removeItem("auth-toast")
+    }
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { signOut, useSession } from "next-auth/react"
 import { HeartPulse, LogOut, User } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -26,7 +26,6 @@ type HeaderProps = {
 export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: HeaderProps) {
   const { data: session, status } = useSession()
   const pathname = usePathname()
-  const router = useRouter()
   const role = (session?.user as any)?.role
   const isPrivilegedUser = role === "admin" || role === "staff"
   const isAdmin = role === "admin"
@@ -40,16 +39,22 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
     window.dispatchEvent(new CustomEvent("auth-logout-started"))
 
     try {
-      const result = await signOut({
+      await signOut({
         redirect: false,
         callbackUrl: "/auth/login",
       })
 
-      toast.success("You have successfully logged out")
-      router.replace(result?.url || "/auth/login")
-      router.refresh()
+      window.sessionStorage.setItem("auth-toast", JSON.stringify({
+        type: "success",
+        message: "You have successfully logged out",
+      }))
+      window.location.replace("/auth/login")
     } catch (error) {
       console.error("Logout failed:", error)
+      window.sessionStorage.setItem("auth-toast", JSON.stringify({
+        type: "error",
+        message: "Failed to log out. Please try again.",
+      }))
       toast.error("Failed to log out. Please try again.")
       setIsLoggingOut(false)
     }
