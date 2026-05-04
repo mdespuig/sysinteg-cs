@@ -4,14 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import {
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   CircleDot,
   CheckCircle2,
   Clock3,
   ListTodo,
-  Loader2,
   MessageCircle,
   PlayCircle,
   RefreshCw,
@@ -430,9 +428,8 @@ export default function RecordsPage() {
 
         <div className="mb-6 mt-6 flex shrink-0 items-center justify-between">
           <Button variant="ghost" asChild className="cursor-pointer">
-            <Link href="/dashboard">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+            <Link href="/dashboard" aria-label="Back">
+              <ChevronLeft className="h-4 w-4" />
             </Link>
           </Button>
           <h1 className="flex-1 text-center text-3xl font-bold">List of Inquiries</h1>
@@ -608,9 +605,22 @@ export default function RecordsPage() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-16 text-slate-500">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Loading...
+            <div className="animate-pulse overflow-hidden rounded-3xl border border-blue-100 bg-[#F8FFFE] p-4">
+              <div className={`grid gap-4 border-b border-blue-100 pb-3 ${isAdmin ? "grid-cols-[2.5rem_1.2fr_1fr_1fr_1fr_1fr_4rem]" : "grid-cols-[1.2fr_1fr_1fr_1fr_1fr_4rem]"}`}>
+                {Array.from({ length: isAdmin ? 7 : 6 }).map((_, index) => (
+                  <div key={`header-${index}`} className="h-4 rounded bg-blue-100/70" />
+                ))}
+              </div>
+              {Array.from({ length: 6 }).map((_, rowIndex) => (
+                <div
+                  key={`row-${rowIndex}`}
+                  className={`grid gap-4 border-b border-slate-100 py-3 last:border-b-0 ${isAdmin ? "grid-cols-[2.5rem_1.2fr_1fr_1fr_1fr_1fr_4rem]" : "grid-cols-[1.2fr_1fr_1fr_1fr_1fr_4rem]"}`}
+                >
+                  {Array.from({ length: isAdmin ? 7 : 6 }).map((__, colIndex) => (
+                    <div key={`cell-${rowIndex}-${colIndex}`} className="h-3 rounded bg-slate-200/80" />
+                  ))}
+                </div>
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center text-slate-500">

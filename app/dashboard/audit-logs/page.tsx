@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { redirect, useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { ChevronLeft, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Header } from "@/components/header"
@@ -111,9 +111,8 @@ export default function AuditLogsPage() {
       <main className="mx-auto max-w-7xl px-4 pb-8">
         <div className="mb-6 mt-6 flex shrink-0 items-center justify-between">
           <Button variant="ghost" asChild className="cursor-pointer">
-            <Link href="/dashboard">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+            <Link href="/dashboard" aria-label="Back">
+              <ChevronLeft className="h-4 w-4" />
             </Link>
           </Button>
           <h1 className="flex-1 text-center text-3xl font-bold">Audit Logs</h1>
@@ -146,9 +145,26 @@ export default function AuditLogsPage() {
 
           <div className="max-h-[calc(100vh-17rem)] overflow-auto rounded-3xl border border-blue-100 bg-[#F8FFFE]">
             {loading ? (
-              <div className="flex items-center justify-center py-16 text-slate-500">
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                {emptyState}
+              <div className="animate-pulse p-4">
+                <div className="mb-3 grid grid-cols-[11rem_10rem_7rem_6rem_1fr] gap-4 border-b border-blue-100 pb-3">
+                  <div className="h-4 rounded bg-blue-100/70" />
+                  <div className="h-4 rounded bg-blue-100/70" />
+                  <div className="h-4 rounded bg-blue-100/70" />
+                  <div className="h-4 rounded bg-blue-100/70" />
+                  <div className="h-4 rounded bg-blue-100/70" />
+                </div>
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="grid grid-cols-[11rem_10rem_7rem_6rem_1fr] gap-4 border-b border-slate-100 py-3 last:border-b-0"
+                  >
+                    <div className="h-3 rounded bg-slate-200/80" />
+                    <div className="h-3 rounded bg-slate-200/80" />
+                    <div className="h-3 rounded bg-[#D2F1FF]" />
+                    <div className="h-3 rounded bg-slate-200/80" />
+                    <div className="h-3 rounded bg-slate-200/80" />
+                  </div>
+                ))}
               </div>
             ) : logs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center text-slate-500">

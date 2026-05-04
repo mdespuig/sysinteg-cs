@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 import {
   HeartPulse,
   Shield,
@@ -31,7 +32,10 @@ const homepageSections = [
 type HomepageSectionId = (typeof homepageSections)[number]["id"]
 
 export default function LandingPage() {
+  const { data: session, status } = useSession()
   const [activeSection, setActiveSection] = useState<HomepageSectionId>("overview")
+  const [isCheckingProfileSetup, setIsCheckingProfileSetup] = useState(false)
+  const [requiresProfileSetup, setRequiresProfileSetup] = useState(false)
   const scrollContainerRef = useRef<HTMLElement | null>(null)
   const sectionRefs = useRef<Record<HomepageSectionId, HTMLElement | null>>({
     overview: null,
@@ -39,6 +43,63 @@ export default function LandingPage() {
     about: null,
     contact: null,
   })
+  const userId = (session?.user as any)?.id as string | undefined
+  const role = (session?.user as any)?.role
+  const isStandardUser = role === "standard"
+  const completionCacheKey = userId ? `profile-setup-complete:${userId}` : null
+  const hasCachedProfileSetupComplete =
+    typeof window !== "undefined" &&
+    completionCacheKey !== null &&
+    window.localStorage.getItem(completionCacheKey) === "true"
+
+  useEffect(() => {
+    if (status !== "authenticated" || !isStandardUser || hasCachedProfileSetupComplete) {
+      setRequiresProfileSetup(false)
+      setIsCheckingProfileSetup(false)
+      return
+    }
+
+    setRequiresProfileSetup(false)
+    setIsCheckingProfileSetup(true)
+  }, [hasCachedProfileSetupComplete, isStandardUser, status])
+
+  useEffect(() => {
+    const handleProfileSetupStatus = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        userId?: string
+        requiresSetup?: boolean
+        checkingFailed?: boolean
+      }>).detail
+      if (!userId || detail?.userId !== userId) return
+
+      if (detail.checkingFailed) {
+        setIsCheckingProfileSetup(false)
+        return
+      }
+
+      const requiresSetup = Boolean(detail.requiresSetup)
+      setRequiresProfileSetup(requiresSetup)
+      setIsCheckingProfileSetup(false)
+      if (completionCacheKey) {
+        window.localStorage.setItem(completionCacheKey, requiresSetup ? "false" : "true")
+      }
+    }
+
+    const handleProfileSetupComplete = () => {
+      setRequiresProfileSetup(false)
+      setIsCheckingProfileSetup(false)
+      if (completionCacheKey) {
+        window.localStorage.setItem(completionCacheKey, "true")
+      }
+    }
+
+    window.addEventListener("profile-setup-status", handleProfileSetupStatus)
+    window.addEventListener("profile-setup-complete", handleProfileSetupComplete)
+    return () => {
+      window.removeEventListener("profile-setup-status", handleProfileSetupStatus)
+      window.removeEventListener("profile-setup-complete", handleProfileSetupComplete)
+    }
+  }, [completionCacheKey, userId])
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -82,8 +143,13 @@ export default function LandingPage() {
     sectionRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
+  const shouldDimPage =
+    isStandardUser &&
+    !hasCachedProfileSetupComplete &&
+    (isCheckingProfileSetup || requiresProfileSetup)
+
   return (
-    <div className="h-screen overflow-hidden bg-background">
+    <div className="relative h-screen overflow-hidden bg-background">
       <Header />
 
       <div className="fixed right-10 top-1/2 z-40 hidden -translate-y-1/2 flex-col items-center gap-3 md:flex">
@@ -375,6 +441,10 @@ export default function LandingPage() {
           </div>
         </section>
       </main>
+
+      {shouldDimPage ? (
+        <div className="absolute inset-0 z-50 bg-black/55 backdrop-blur-sm" />
+      ) : null}
     </div>
   )
 }

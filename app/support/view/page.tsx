@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import {
-  ArrowLeft,
+  ChevronLeft,
   Search,
   FileText,
   Calendar,
@@ -20,7 +20,6 @@ import {
   History,
   Plus,
   Filter,
-  Loader2,
   LogIn,
   MessageCircle,
   Star,
@@ -56,6 +55,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Header } from "@/components/header"
+import { AnimatedError } from "@/components/ui/animated-error"
 import {
   inquiryTypes,
   getStatusColor,
@@ -516,30 +516,39 @@ export default function ViewInquiriesPage() {
       <main className="container mx-auto flex h-[calc(100vh-4rem)] flex-col overflow-hidden px-4 py-4 md:py-6">
         <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col">
           <div className="shrink-0 bg-background pb-4">
-          <div className="mb-4 flex justify-start">
-            <Button variant="ghost" asChild className="cursor-pointer px-0">
-              <Link href="/support">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Support
-              </Link>
-            </Button>
-          </div>
-
-          <div className="text-center">
-            <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-              View Inquiries
-            </h1>
-            <p className="text-muted-foreground">
+            <div className="mb-2 grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center">
+              <Button variant="ghost" asChild className="h-10 w-10 cursor-pointer justify-self-start p-0">
+                <Link href="/support" aria-label="Back">
+                  <ChevronLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+              <h1 className="text-center text-2xl font-bold tracking-tight text-foreground md:text-3xl">
+                View Inquiries
+              </h1>
+              <span aria-hidden="true" className="h-10 w-10" />
+            </div>
+            <p className="text-center text-muted-foreground">
               Search for an inquiry by ID or browse your inquiry history.
             </p>
-          </div>
           </div>
 
           {loading && (
             <Card className="shrink-0">
-              <CardContent className="flex items-center justify-center py-12">
-                <Loader2 className="mr-2 h-5 w-5 animate-spin text-primary" />
-                <p className="text-muted-foreground">Loading your inquiries...</p>
+              <CardContent className="animate-pulse space-y-4 py-6">
+                <div className="h-5 w-56 rounded bg-slate-200/80" />
+                <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)_300px]">
+                  <div className="space-y-3">
+                    <div className="h-24 rounded-lg bg-slate-200/70" />
+                    <div className="h-36 rounded-lg bg-slate-200/70" />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="h-12 rounded-lg bg-slate-200/70" />
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="h-24 rounded-lg bg-slate-200/70" />
+                    ))}
+                  </div>
+                  <div className="h-48 rounded-lg bg-slate-200/70" />
+                </div>
               </CardContent>
             </Card>
           )}
@@ -548,7 +557,7 @@ export default function ViewInquiriesPage() {
             <Card className="shrink-0 border-destructive/30">
               <CardContent className="py-12 text-center">
                 <AlertCircle className="mx-auto mb-4 h-12 w-12 text-destructive/70" />
-                <p className="mb-2 font-medium text-destructive">{fetchError}</p>
+                <AnimatedError message={fetchError} className="mb-2 font-medium text-destructive" />
                 <Button className="mt-4 cursor-pointer" asChild>
                   <Link href="/auth/login">
                     <LogIn className="mr-2 h-4 w-4" />
@@ -595,7 +604,7 @@ export default function ViewInquiriesPage() {
                         {searchError ? (
                           <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
                             <AlertCircle className="h-5 w-5 shrink-0 text-destructive" />
-                            <p className="text-sm text-destructive">{searchError}</p>
+                            <AnimatedError message={searchError} className="text-sm text-destructive" />
                           </div>
                         ) : searchResult ? (
                           <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-1">

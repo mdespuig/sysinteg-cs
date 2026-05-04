@@ -6,6 +6,7 @@ import { redirect, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Header } from "@/components/header"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -42,6 +43,7 @@ export default function DashboardPage() {
   const [savingAnnouncement, setSavingAnnouncement] = useState(false)
   const [announcementConfirmOpen, setAnnouncementConfirmOpen] = useState(false)
   const [announcementTarget, setAnnouncementTarget] = useState<AnnouncementAudienceExtended>("all")
+  const [profileAvatar, setProfileAvatar] = useState<string | null>(null)
   const [counts, setCounts] = useState<InquiryCounts>({
     total: 0,
     pending: 0,
@@ -49,6 +51,9 @@ export default function DashboardPage() {
     resolved: 0,
     closed: 0,
   })
+  const normalizedRole = typeof role === "string" ? role.toLowerCase() : "user"
+  const roleLabel = normalizedRole.charAt(0).toUpperCase() + normalizedRole.slice(1)
+  const roleArticle = normalizedRole === "admin" ? "an" : "a"
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -56,6 +61,29 @@ export default function DashboardPage() {
       router.replace("/")
     }
   }, [status, session?.user, router])
+
+  useEffect(() => {
+    const userId = (session?.user as any)?.id as string | undefined
+    if (!userId) return
+
+    const cacheKey = `profile-avatar:${userId}`
+    const cachedAvatar = window.localStorage.getItem(cacheKey)
+    if (cachedAvatar !== null) {
+      setProfileAvatar(cachedAvatar || null)
+    }
+  }, [session?.user])
+
+  useEffect(() => {
+    const handleAvatarUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId?: string; profileImage?: string | null }>).detail
+      const userId = (session?.user as any)?.id as string | undefined
+      if (!detail || !userId || detail.userId !== userId) return
+      setProfileAvatar(detail.profileImage ?? null)
+    }
+
+    window.addEventListener("profile-avatar-updated", handleAvatarUpdated as EventListener)
+    return () => window.removeEventListener("profile-avatar-updated", handleAvatarUpdated as EventListener)
+  }, [session?.user])
 
   useEffect(() => {
     if (!canViewRecords) return
@@ -139,8 +167,39 @@ export default function DashboardPage() {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p>Loading...</p>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto animate-pulse px-4 py-8">
+          <div className="mb-8 space-y-3">
+            <div className="h-10 w-80 rounded bg-slate-200/80" />
+            <div className="h-5 w-lg rounded bg-slate-200/70" />
+          </div>
+
+          <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="rounded-xl border bg-card p-6">
+              <div className="mb-4 h-6 w-44 rounded bg-slate-200/80" />
+              <div className="mb-6 h-4 w-72 rounded bg-slate-200/70" />
+              <div className="space-y-3">
+                <div className="h-14 rounded-lg bg-slate-200/70" />
+                <div className="h-12 rounded-lg bg-slate-200/70" />
+                <div className="h-12 rounded-lg bg-slate-200/70" />
+              </div>
+            </div>
+            <div className="rounded-xl border bg-card p-6">
+              <div className="mb-4 h-6 w-40 rounded bg-slate-200/80" />
+              <div className="mb-6 h-4 w-80 rounded bg-slate-200/70" />
+              <div className="space-y-3">
+                <div className="h-14 rounded-lg bg-slate-200/70" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="h-16 rounded-lg bg-slate-200/70" />
+                  <div className="h-16 rounded-lg bg-slate-200/70" />
+                  <div className="h-16 rounded-lg bg-slate-200/70" />
+                  <div className="h-16 rounded-lg bg-slate-200/70" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     )
   }
@@ -170,9 +229,24 @@ export default function DashboardPage() {
                 <User className="h-5 w-5" />
                 Profile Information
               </CardTitle>
+              <CardDescription>
+                View your account information and access profile settings.
+              </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col gap-4">
               <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-12 w-12 border border-border">
+                    <AvatarImage src={profileAvatar || undefined} alt={session?.user?.name || "User avatar"} />
+                    <AvatarFallback className="bg-[#006AEE] text-white">
+                      {(session?.user?.name?.charAt(0).toUpperCase() || "U")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Signed in as {roleArticle}</p>
+                    <p className="font-medium">{roleLabel}</p>
+                  </div>
+                </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Username</p>
                   <p className="font-medium">{session?.user?.name}</p>
@@ -196,6 +270,9 @@ export default function DashboardPage() {
                 <Mail className="h-5 w-5" />
                 Medical Records
               </CardTitle>
+              <CardDescription>
+                Monitor inquiry volume and status breakdown with quick access to records.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-end justify-between gap-4">

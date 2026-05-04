@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Bell, CheckCheck } from "lucide-react"
+import { Bell, CheckCheck, ClipboardList, MessageCircle, Megaphone, ShieldAlert, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -15,11 +15,35 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 
 type Notification = {
   _id: string
+  type?: string
   title: string
   message: string
   href: string
   readAt?: string | null
   createdAt: string
+}
+
+function getNotificationIcon(type?: string) {
+  switch (type) {
+    case "message-received":
+      return MessageCircle
+    case "rating-requested":
+    case "rating-received":
+      return Star
+    case "announcement":
+      return Megaphone
+    case "staff-reminder":
+      return ShieldAlert
+    case "inquiry-created":
+    case "inquiry-assigned":
+    case "inquiry-updated":
+    case "inquiry-resolved":
+    case "inquiry-closed":
+    case "inquiry-rejected":
+      return ClipboardList
+    default:
+      return Bell
+  }
 }
 
 function formatNotificationTime(value: string) {
@@ -119,7 +143,9 @@ export function NotificationMenu() {
         body: JSON.stringify({ all: true }),
       })
     } finally {
-      setLoading(false)
+      if (isMountedRef.current) {
+        setLoading(false)
+      }
     }
   }
 
@@ -173,6 +199,7 @@ export function NotificationMenu() {
             <div className="p-1">
               {notifications.map((notification) => {
                 const unread = !notification.readAt
+                const NotificationIcon = getNotificationIcon(notification.type)
 
                 return (
                   <button
@@ -181,7 +208,9 @@ export function NotificationMenu() {
                     className="flex w-full cursor-pointer gap-3 rounded-md px-3 py-2 text-left hover:bg-[#006AEE]/10 focus:bg-[#006AEE]/10 focus:outline-none"
                     onClick={() => void openNotification(notification)}
                   >
-                    <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${unread ? "bg-[#006AEE]" : "bg-transparent"}`} />
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#006AEE]/10 text-[#006AEE]">
+                      <NotificationIcon className="h-3.5 w-3.5" />
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span className={`block text-sm ${unread ? "font-bold text-foreground" : "font-medium text-foreground"}`}>
                         {notification.title}
