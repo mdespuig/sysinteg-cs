@@ -5,10 +5,19 @@ import Credentials from "next-auth/providers/credentials"
 import clientPromise from "@/lib/db"
 
 const USERS_COLLECTION = "users"
-const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") || process.env.NODE_ENV === "production"
+const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false
 const sessionCookieName = `${useSecureCookies ? "__Secure-" : ""}next-auth.session-token`
 
 export const authConfig: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60,
+    updateAge: 24 * 60 * 60,
+  },
+  jwt: {
+    maxAge: 30 * 24 * 60 * 60,
+  },
   cookies: {
     sessionToken: {
       name: sessionCookieName,

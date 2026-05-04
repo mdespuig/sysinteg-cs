@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useSession } from "next-auth/react"
+import { signOut, useSession } from "next-auth/react"
 import { HeartPulse, LogOut, User } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -24,7 +24,7 @@ type HeaderProps = {
 }
 
 export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: HeaderProps) {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const pathname = usePathname()
   const router = useRouter()
   const role = (session?.user as any)?.role
@@ -33,24 +33,25 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
   const showDashboardLink = pathname === "/"
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState("")
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const handleLogout = async () => {
+    setIsLoggingOut(true)
+    window.dispatchEvent(new CustomEvent("auth-logout-started"))
+
     try {
-      const response = await fetch("/api/v1/auth/logout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const result = await signOut({
+        redirect: false,
+        callbackUrl: "/auth/login",
       })
-      const data = await response.json()
 
-      if (!response.ok || data?.success === false) {
-        throw new Error(data?.error || "Logout failed")
-      }
-
-      toast.success(data?.message || "You have successfully logged out")
-      router.push(data?.redirectTo || "/auth/login")
+      toast.success("You have successfully logged out")
+      router.replace(result?.url || "/auth/login")
+      router.refresh()
     } catch (error) {
       console.error("Logout failed:", error)
       toast.error("Failed to log out. Please try again.")
+      setIsLoggingOut(false)
     }
   }
 
@@ -203,7 +204,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
         </nav>
 
         <div className="flex items-center justify-self-end gap-2">
-          {session?.user ? (
+          {status === "loading" ? null : session?.user && !isLoggingOut ? (
             <>
               <NotificationMenu />
               <DropdownMenu>
@@ -259,7 +260,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
         </div>
       </div>
     </header>
-    <ProfileSetupModal />
+    {status === "authenticated" && session?.user?.id && !isLoggingOut ? <ProfileSetupModal /> : null}
     </>
   )
 }

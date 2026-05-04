@@ -230,6 +230,19 @@ export function ProfileSetupModal() {
   const showModalForRole = isStandard
 
   useEffect(() => {
+    const closeForLogout = () => {
+      setOpen(false)
+      setChecking(false)
+      setSaving(false)
+      setSetupData(defaultSetupData)
+      setErrors({ personalData: {}, emergencyContact: {} })
+    }
+
+    window.addEventListener("auth-logout-started", closeForLogout)
+    return () => window.removeEventListener("auth-logout-started", closeForLogout)
+  }, [])
+
+  useEffect(() => {
     if (status !== "authenticated" || !showModalForRole || pathname === "/profile") {
       setChecking(false)
       setOpen(false)

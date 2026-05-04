@@ -34,7 +34,6 @@ type HomepageSectionId = (typeof homepageSections)[number]["id"]
 export default function LandingPage() {
   const { data: session, status } = useSession()
   const [activeSection, setActiveSection] = useState<HomepageSectionId>("overview")
-  const [isCheckingProfileSetup, setIsCheckingProfileSetup] = useState(false)
   const [requiresProfileSetup, setRequiresProfileSetup] = useState(false)
   const scrollContainerRef = useRef<HTMLElement | null>(null)
   const sectionRefs = useRef<Record<HomepageSectionId, HTMLElement | null>>({
@@ -55,12 +54,10 @@ export default function LandingPage() {
   useEffect(() => {
     if (status !== "authenticated" || !isStandardUser || hasCachedProfileSetupComplete) {
       setRequiresProfileSetup(false)
-      setIsCheckingProfileSetup(false)
       return
     }
 
     setRequiresProfileSetup(false)
-    setIsCheckingProfileSetup(true)
   }, [hasCachedProfileSetupComplete, isStandardUser, status])
 
   useEffect(() => {
@@ -73,13 +70,11 @@ export default function LandingPage() {
       if (!userId || detail?.userId !== userId) return
 
       if (detail.checkingFailed) {
-        setIsCheckingProfileSetup(false)
         return
       }
 
       const requiresSetup = Boolean(detail.requiresSetup)
       setRequiresProfileSetup(requiresSetup)
-      setIsCheckingProfileSetup(false)
       if (completionCacheKey) {
         window.localStorage.setItem(completionCacheKey, requiresSetup ? "false" : "true")
       }
@@ -87,7 +82,6 @@ export default function LandingPage() {
 
     const handleProfileSetupComplete = () => {
       setRequiresProfileSetup(false)
-      setIsCheckingProfileSetup(false)
       if (completionCacheKey) {
         window.localStorage.setItem(completionCacheKey, "true")
       }
@@ -146,7 +140,7 @@ export default function LandingPage() {
   const shouldDimPage =
     isStandardUser &&
     !hasCachedProfileSetupComplete &&
-    (isCheckingProfileSetup || requiresProfileSetup)
+    requiresProfileSetup
 
   return (
     <div className="relative h-screen overflow-hidden bg-background">

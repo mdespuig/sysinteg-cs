@@ -527,7 +527,68 @@ export default function ProfilePage() {
   const avatarSrc = useDefaultAvatarPreview ? defaultAvatarSrc : profileData.profileImage
 
   if (status === "loading") {
-    return <div className="flex h-screen items-center justify-center overflow-hidden bg-background">Loading...</div>
+    return (
+      <div className="h-screen overflow-hidden bg-background">
+        <Header />
+
+        <main className="container mx-auto flex h-[calc(100vh-4rem)] flex-col overflow-hidden px-4 py-4">
+          <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
+            <div className="mb-6 mt-6 flex shrink-0 items-center justify-between animate-pulse">
+              <div className="h-10 w-10 rounded-lg bg-slate-200/80" />
+              <div className="flex flex-1 flex-col items-center gap-3">
+                <div className="h-8 w-40 rounded bg-slate-200/80" />
+                <div className="h-4 w-72 max-w-full rounded bg-slate-200/70" />
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-slate-200/80" />
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-2 pb-4">
+              <Card className="mb-6 animate-pulse">
+                <CardHeader>
+                  <div className="h-6 w-40 rounded bg-slate-200/80" />
+                  <div className="h-4 w-80 max-w-full rounded bg-slate-200/70" />
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col items-center gap-4 sm:flex-row">
+                    <div className="h-28 w-28 rounded-full bg-slate-200/80" />
+                    <div className="flex flex-col items-center gap-2 sm:items-start">
+                      <div className="h-10 w-44 rounded-md bg-slate-200/70" />
+                      <div className="h-10 w-44 rounded-md bg-slate-200/70" />
+                      <div className="h-10 w-44 rounded-md bg-slate-200/70" />
+                      <div className="h-4 w-28 rounded bg-slate-200/70" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="animate-pulse">
+                <CardHeader>
+                  <div className="h-6 w-48 rounded bg-slate-200/80" />
+                  <div className="h-4 w-72 max-w-full rounded bg-slate-200/70" />
+                </CardHeader>
+                <CardContent className="space-y-8">
+                  <div className="space-y-4">
+                    <div className="h-5 w-40 rounded bg-slate-200/80" />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {Array.from({ length: 6 }).map((_, index) => (
+                        <div key={index} className="space-y-2">
+                          <div className="h-4 w-24 rounded bg-slate-200/80" />
+                          <div className="h-10 w-full rounded-lg bg-slate-200/70" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 w-24 rounded bg-slate-200/80" />
+                      <div className="h-10 w-full rounded-lg bg-slate-200/70" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
   }
 
   if (status === "unauthenticated") {
