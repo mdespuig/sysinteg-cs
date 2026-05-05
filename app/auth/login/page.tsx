@@ -4,12 +4,23 @@ import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { getSession, signIn } from "next-auth/react"
-import { Eye, EyeOff, HeartPulse, Loader2 } from "lucide-react"
+import { Eye, EyeOff, HeartPulse, Loader2, ShieldCheck, UserRoundCog } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { toast } from "sonner"
+
+type LoginRole = "staff" | "admin"
+
+const roleSelectionRequiredMessage = "Choose Staff or Administrator before logging in"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -17,6 +28,8 @@ export default function LoginPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<LoginRole | null>(null)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,8 +39,14 @@ export default function LoginPage() {
       const result = await signIn("credentials", {
         username,
         password,
+        subsystem: "Customer",
         redirect: false,
       })
+
+      if (result?.error === roleSelectionRequiredMessage) {
+        setRoleDialogOpen(true)
+        return
+      }
 
       if (result?.error) {
         toast.error(result.error)
@@ -45,6 +64,36 @@ export default function LoginPage() {
       toast.error("An error occurred during login")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleRoleLogin = async (loginAs: LoginRole) => {
+    setIsLoading(true)
+    setSelectedRole(loginAs)
+
+    try {
+      const result = await signIn("credentials", {
+        username,
+        password,
+        subsystem: "Customer",
+        loginAs,
+        redirect: false,
+      })
+
+      if (result?.error) {
+        toast.error(result.error)
+        return
+      }
+
+      setRoleDialogOpen(false)
+      toast.success("Logged in successfully")
+      router.push("/dashboard")
+      router.refresh()
+    } catch (error) {
+      toast.error("An error occurred during login")
+    } finally {
+      setIsLoading(false)
+      setSelectedRole(null)
     }
   }
 
@@ -146,6 +195,51 @@ export default function LoginPage() {
           </Link>
         </div>
       </div>
+      <Dialog
+        open={roleDialogOpen}
+        onOpenChange={(open) => {
+          if (!isLoading) setRoleDialogOpen(open)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose login type</DialogTitle>
+            <DialogDescription>
+              Select the access type assigned to this Customer Support account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto min-h-24 cursor-pointer flex-col gap-3 py-5"
+              disabled={isLoading}
+              onClick={() => handleRoleLogin("staff")}
+            >
+              {isLoading && selectedRole === "staff" ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                <UserRoundCog className="h-6 w-6" />
+              )}
+              <span>Login as Staff</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto min-h-24 cursor-pointer flex-col gap-3 py-5"
+              disabled={isLoading}
+              onClick={() => handleRoleLogin("admin")}
+            >
+              {isLoading && selectedRole === "admin" ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                <ShieldCheck className="h-6 w-6" />
+              )}
+              <span>Login as Administrator</span>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

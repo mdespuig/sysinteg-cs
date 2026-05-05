@@ -128,6 +128,36 @@ export async function markNotificationsRead(request: NextRequest) {
   }
 }
 
+export async function deleteNotification(request: NextRequest) {
+  try {
+    const auth = await requireUser()
+    if (auth.error) return auth.error
+
+    const body = await request.json()
+    const notificationId = typeof body.notificationId === "string" ? body.notificationId : ""
+
+    if (!ObjectId.isValid(notificationId)) {
+      return NextResponse.json({ error: "Notification ID is required" }, { status: 400 })
+    }
+
+    const client = await clientPromise
+    const db = client.db(DATABASE_NAME)
+    const result = await db.collection(NOTIFICATIONS_COLLECTION).deleteOne({
+      _id: new ObjectId(notificationId),
+      recipientId: auth.userId,
+    })
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json({ error: "Notification not found" }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Error deleting notification:", error)
+    return NextResponse.json({ error: "Failed to delete notification" }, { status: 500 })
+  }
+}
+
 export async function createAnnouncement(request: NextRequest) {
   try {
     const auth = await requireUser()
