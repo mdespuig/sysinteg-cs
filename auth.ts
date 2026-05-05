@@ -7,7 +7,7 @@ const USERS_COLLECTION = "users"
 const PROFILE_COLLECTION = "profile"
 const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false
 const sessionCookieName = `${useSecureCookies ? "__Secure-" : ""}next-auth.session-token`
-const subsystemLoginUrl = process.env.AUTH_SUBSYSTEM_VERIFY_URL || "https://admin-subystem.onrender.com/admin/api/auth/subsystem-login"
+const subsystemLoginUrl = process.env.AUTH_SUBSYSTEM_VERIFY_URL || ""
 const subsystemApiKey = process.env.AUTH_SUBSYSTEM_API_KEY || ""
 const roleSelectionRequiredMessage = "Choose Staff or Administrator before logging in"
 

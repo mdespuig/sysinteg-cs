@@ -71,7 +71,7 @@ username=your_username
 password=your_password
 callbackUrl=/dashboard
 subsystem=Customer
-loginAs=staff
+loginAs=(admin/staff)
 ```
 
 Use `loginAs=admin` for administrator accounts.
