@@ -5,8 +5,19 @@ import Credentials from "next-auth/providers/credentials"
 import clientPromise from "@/lib/db"
 
 const USERS_COLLECTION = "users"
+const PROFILE_COLLECTION = "profile"
 const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false
 const sessionCookieName = `${useSecureCookies ? "__Secure-" : ""}next-auth.session-token`
+
+function buildPreferredName(profile: any, user: any) {
+  const firstName = String(profile?.personalData?.firstName || "").trim()
+  const lastName = String(profile?.personalData?.lastName || "").trim()
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim()
+
+  if (fullName) return fullName
+
+  return user?.email || ""
+}
 
 export const authConfig: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -44,6 +55,7 @@ export const authConfig: NextAuthOptions = {
           const client = await clientPromise
           const db = client.db("healthcare")
           const usersCollection = db.collection(USERS_COLLECTION)
+          const profileCollection = db.collection(PROFILE_COLLECTION)
 
           const user = await usersCollection.findOne({
             username: (credentials.username as string).trim().toLowerCase(),
@@ -62,9 +74,13 @@ export const authConfig: NextAuthOptions = {
             throw new Error("Invalid credentials")
           }
 
+          const profile = user?._id
+            ? await profileCollection.findOne({ userId: user._id.toString() })
+            : null
+
           return {
             id: user._id?.toString(),
-            name: (user.username as string).toLowerCase(),
+            name: buildPreferredName(profile, user),
             email: user.email,
             image: null,
           }
@@ -81,15 +97,19 @@ export const authConfig: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
+        token.name = user.name ?? token.name
         try {
           const client = await clientPromise
           const db = client.db("healthcare")
           const usersCollection = db.collection(USERS_COLLECTION)
+          const profileCollection = db.collection(PROFILE_COLLECTION)
           const dbUser = await usersCollection.findOne({
             _id: new ObjectId(user.id),
           })
           if (dbUser) {
             token.role = dbUser.role
+            const profile = await profileCollection.findOne({ userId: user.id })
+            token.name = buildPreferredName(profile, dbUser) || token.name
           }
         } catch (error) {
           console.error("Error fetching user role:", error)
@@ -100,6 +120,7 @@ export const authConfig: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.name = (token.name as string) || session.user.name
         ;(session.user as any).role = token.role as string
       }
       return session

@@ -110,7 +110,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
         const lastName = data.data?.personalData?.lastName?.trim?.() || ""
         const nextDisplayName = [firstName, lastName].filter(Boolean).join(" ").trim()
         setProfileImage(nextImage)
-        setDisplayName(nextDisplayName || session?.user?.name || "")
+        setDisplayName(nextDisplayName)
         window.localStorage.setItem(cacheKey, nextImage ?? "")
       } catch (error) {
         if ((error as Error).name === "AbortError") return
@@ -126,7 +126,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
       controller.abort()
       window.removeEventListener("profile-avatar-updated", syncAvatar)
     }
-  }, [session?.user?.id, session?.user?.name])
+  }, [session?.user?.id])
 
   useEffect(() => {
     if (!session?.user?.id) return
