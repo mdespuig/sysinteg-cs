@@ -8,13 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { toast } from "sonner"
 
 export default function SignupPage() {
@@ -28,16 +21,11 @@ export default function SignupPage() {
     email: "",
     password: "",
     confirmPassword: "",
-    role: "standard",
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleRoleChange = (value: string) => {
-    setFormData((prev) => ({ ...prev, role: value }))
   }
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -211,22 +199,6 @@ export default function SignupPage() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="role" className="text-sm font-medium">
-                  Role
-                </Label>
-                <Select value={formData.role} onValueChange={handleRoleChange}>
-                  <SelectTrigger className="h-10 w-full" disabled={isLoading}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="standard">Standard</SelectItem>
-                    <SelectItem value="staff">Staff</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
 
               <Button

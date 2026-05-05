@@ -9,14 +9,22 @@ const PROFILE_COLLECTION = "profile"
 const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false
 const sessionCookieName = `${useSecureCookies ? "__Secure-" : ""}next-auth.session-token`
 
+<<<<<<< HEAD
 function buildPreferredName(profile: any, user: any) {
+=======
+function buildDisplayName(profile: any, user: any) {
+>>>>>>> prod
   const firstName = String(profile?.personalData?.firstName || "").trim()
   const lastName = String(profile?.personalData?.lastName || "").trim()
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim()
 
   if (fullName) return fullName
 
+<<<<<<< HEAD
   return user?.email || ""
+=======
+  return String(user?.email || "").trim()
+>>>>>>> prod
 }
 
 export const authConfig: NextAuthOptions = {
@@ -77,10 +85,21 @@ export const authConfig: NextAuthOptions = {
           const profile = user?._id
             ? await profileCollection.findOne({ userId: user._id.toString() })
             : null
+<<<<<<< HEAD
 
           return {
             id: user._id?.toString(),
             name: buildPreferredName(profile, user),
+=======
+          const displayName =
+            user?.role === "admin"
+              ? String(user.username || "").trim()
+              : buildDisplayName(profile, user)
+
+          return {
+            id: user._id?.toString(),
+            name: displayName,
+>>>>>>> prod
             email: user.email,
             image: null,
           }
@@ -103,6 +122,7 @@ export const authConfig: NextAuthOptions = {
           const db = client.db("healthcare")
           const usersCollection = db.collection(USERS_COLLECTION)
           const profileCollection = db.collection(PROFILE_COLLECTION)
+<<<<<<< HEAD
           const dbUser = await usersCollection.findOne({
             _id: new ObjectId(user.id),
           })
@@ -110,6 +130,20 @@ export const authConfig: NextAuthOptions = {
             token.role = dbUser.role
             const profile = await profileCollection.findOne({ userId: user.id })
             token.name = buildPreferredName(profile, dbUser) || token.name
+=======
+          if (ObjectId.isValid(user.id)) {
+            const dbUser = await usersCollection.findOne({
+              _id: new ObjectId(user.id),
+            })
+            if (dbUser) {
+              token.role = dbUser.role
+              const profile = await profileCollection.findOne({ userId: user.id })
+              token.name =
+                dbUser.role === "admin"
+                  ? String(dbUser.username || token.name || "").trim()
+                  : buildDisplayName(profile, dbUser) || token.name
+            }
+>>>>>>> prod
           }
         } catch (error) {
           console.error("Error fetching user role:", error)
@@ -119,7 +153,11 @@ export const authConfig: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
+<<<<<<< HEAD
         session.user.id = token.id as string;
+=======
+        session.user.id = token.id as string
+>>>>>>> prod
         session.user.name = (token.name as string) || session.user.name
         ;(session.user as any).role = token.role as string
       }

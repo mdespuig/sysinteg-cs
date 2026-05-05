@@ -44,10 +44,14 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
         callbackUrl: "/auth/login",
       })
 
+<<<<<<< HEAD
       window.sessionStorage.setItem("auth-toast", JSON.stringify({
         type: "success",
         message: "You have successfully logged out",
       }))
+=======
+      toast.success("You have successfully logged out")
+>>>>>>> prod
       window.location.replace("/auth/login")
     } catch (error) {
       console.error("Logout failed:", error)
@@ -64,7 +68,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
     const userId = session?.user?.id
     if (!userId) {
       setProfileImage(null)
-      setDisplayName(session?.user?.name || "")
+      setDisplayName(role === "admin" ? session?.user?.name || "" : "")
       return
     }
 
@@ -110,12 +114,16 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
         const lastName = data.data?.personalData?.lastName?.trim?.() || ""
         const nextDisplayName = [firstName, lastName].filter(Boolean).join(" ").trim()
         setProfileImage(nextImage)
+<<<<<<< HEAD
         setDisplayName(nextDisplayName)
+=======
+        setDisplayName(nextDisplayName || (role === "admin" ? session?.user?.name || "" : ""))
+>>>>>>> prod
         window.localStorage.setItem(cacheKey, nextImage ?? "")
       } catch (error) {
         if ((error as Error).name === "AbortError") return
         console.error("Failed to load header avatar:", error)
-        setDisplayName(session?.user?.name || "")
+        setDisplayName(role === "admin" ? session?.user?.name || "" : "")
       }
     }
 
@@ -126,7 +134,11 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
       controller.abort()
       window.removeEventListener("profile-avatar-updated", syncAvatar)
     }
+<<<<<<< HEAD
   }, [session?.user?.id])
+=======
+  }, [session?.user?.id, session?.user?.name, role])
+>>>>>>> prod
 
   useEffect(() => {
     if (!session?.user?.id) return
