@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { createAnnouncement, listNotifications, markNotificationsRead } from "./controllers"
+import { createAnnouncement, deleteNotification, listNotifications, markNotificationsRead } from "./controllers"
 
 export async function GET() {
   return listNotifications()
@@ -7,6 +7,10 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   return markNotificationsRead(request)
+}
+
+export async function DELETE(request: NextRequest) {
+  return deleteNotification(request)
 }
 
 export async function POST(request: NextRequest) {

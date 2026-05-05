@@ -27,6 +27,8 @@ export async function loginUser(request: NextRequest) {
     const formData = await request.formData()
     const username = formData.get("username")
     const password = formData.get("password")
+    const subsystem = formData.get("subsystem") || "Customer"
+    const loginAs = formData.get("loginAs")
     const csrfToken = formData.get("csrfToken")
     const callbackUrl = formData.get("callbackUrl") || "/dashboard"
 
@@ -54,6 +56,7 @@ export async function loginUser(request: NextRequest) {
     formData.set("callbackUrl", String(callbackUrl))
     formData.set("json", "true")
     formData.set("redirect", "false")
+    formData.set("subsystem", String(subsystem))
 
     const authResponse = await fetch(`${origin}${NEXTAUTH_CREDENTIALS_URL}`, {
       method: "POST",
@@ -91,7 +94,7 @@ export async function loginUser(request: NextRequest) {
       {
         success: true,
         message: "Logged in successfully",
-        redirectTo: await getRedirectForUser(username),
+        redirectTo: typeof loginAs === "string" && loginAs ? "/dashboard" : await getRedirectForUser(username),
       },
       { status: 200 }
     )

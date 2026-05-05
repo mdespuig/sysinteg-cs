@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Bell, CheckCheck, ClipboardList, MessageCircle, Megaphone, ShieldAlert, Star } from "lucide-react"
+import { Bell, CheckCheck, ClipboardList, Ellipsis, MessageCircle, Megaphone, ShieldAlert, Star, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
+  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -149,6 +150,22 @@ export function NotificationMenu() {
     }
   }
 
+  const deleteNotification = async (notificationId: string) => {
+    const wasUnread = notifications.some((notification) => notification._id === notificationId && !notification.readAt)
+
+    setNotifications((current) => current.filter((notification) => notification._id !== notificationId))
+    if (wasUnread) {
+      setUnreadCount((current) => Math.max(0, current - 1))
+    }
+
+    await fetch("/api/v1/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ notificationId }),
+    })
+  }
+
   const openNotification = async (notification: Notification) => {
     if (!notification.readAt) {
       await markRead(notification._id)
@@ -202,27 +219,69 @@ export function NotificationMenu() {
                 const NotificationIcon = getNotificationIcon(notification.type)
 
                 return (
-                  <button
+                  <div
                     key={notification._id}
-                    type="button"
-                    className="flex w-full cursor-pointer gap-3 rounded-md px-3 py-2 text-left hover:bg-[#006AEE]/10 focus:bg-[#006AEE]/10 focus:outline-none"
-                    onClick={() => void openNotification(notification)}
+                    className="group relative rounded-md hover:bg-[#006AEE]/10 focus-within:bg-[#006AEE]/10"
                   >
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#006AEE]/10 text-[#006AEE]">
-                      <NotificationIcon className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className={`block text-sm ${unread ? "font-bold text-foreground" : "font-medium text-foreground"}`}>
-                        {notification.title}
+                    <button
+                      type="button"
+                      className="flex w-full cursor-pointer gap-3 rounded-md px-3 py-2 pr-10 text-left hover:bg-[#006AEE]/10 focus:bg-[#006AEE]/10 focus:outline-none"
+                      onClick={() => void openNotification(notification)}
+                    >
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#006AEE]/10 text-[#006AEE]">
+                        <NotificationIcon className="h-3.5 w-3.5" />
                       </span>
-                      <span className={`mt-0.5 line-clamp-2 block text-xs ${unread ? "font-semibold text-slate-700" : "text-muted-foreground"}`}>
-                        {notification.message}
+                      <span className="min-w-0 flex-1">
+                        <span className={`block text-sm ${unread ? "font-bold text-foreground" : "font-medium text-foreground"}`}>
+                          {notification.title}
+                        </span>
+                        <span className={`mt-0.5 line-clamp-2 block text-xs ${unread ? "font-semibold text-slate-700" : "text-muted-foreground"}`}>
+                          {notification.message}
+                        </span>
+                        <span className="mt-1 block text-[11px] text-muted-foreground">
+                          {formatNotificationTime(notification.createdAt)}
+                        </span>
                       </span>
-                      <span className="mt-1 block text-[11px] text-muted-foreground">
-                        {formatNotificationTime(notification.createdAt)}
-                      </span>
-                    </span>
-                  </button>
+                    </button>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="absolute right-2 top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-background/80 hover:text-foreground group-hover:opacity-100 focus:opacity-100"
+                          aria-label="More actions"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <Ellipsis className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem
+                          className="cursor-pointer"
+                          disabled={unread === false}
+                          onSelect={(event: Event) => {
+                            event.preventDefault()
+                            if (unread) void markRead(notification._id)
+                          }}
+                        >
+                          <CheckCheck className="h-4 w-4" />
+                          Mark as read
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          className="cursor-pointer"
+                          onSelect={(event: Event) => {
+                            event.preventDefault()
+                            void deleteNotification(notification._id)
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 )
               })}
             </div>

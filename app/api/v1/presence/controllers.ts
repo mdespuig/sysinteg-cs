@@ -6,6 +6,8 @@ import clientPromise from "@/lib/db"
 export async function updatePresence(request: NextRequest) {
   const session = await getServerSession(authConfig)
   const userId = (session?.user as any)?.id
+  const username = (session?.user as any)?.username || null
+  const email = session?.user?.email || null
 
   if (!userId) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 })
@@ -27,6 +29,8 @@ export async function updatePresence(request: NextRequest) {
     {
       $set: {
         userId,
+        username,
+        email,
         role: (session?.user as any)?.role || null,
         name: session?.user?.name || null,
         isOnline: state === "online",
