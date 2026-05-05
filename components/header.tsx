@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { signOut, useSession } from "next-auth/react"
 import { HeartPulse, LogOut, User } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -26,7 +26,6 @@ type HeaderProps = {
 export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: HeaderProps) {
   const { data: session, status } = useSession()
   const pathname = usePathname()
-  const router = useRouter()
   const role = (session?.user as any)?.role
   const isPrivilegedUser = role === "admin" || role === "staff"
   const isAdmin = role === "admin"
@@ -40,14 +39,13 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
     window.dispatchEvent(new CustomEvent("auth-logout-started"))
 
     try {
-      const result = await signOut({
+      await signOut({
         redirect: false,
         callbackUrl: "/auth/login",
       })
 
       toast.success("You have successfully logged out")
-      router.replace(result?.url || "/auth/login")
-      router.refresh()
+      window.location.replace("/auth/login")
     } catch (error) {
       console.error("Logout failed:", error)
       toast.error("Failed to log out. Please try again.")
@@ -59,7 +57,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
     const userId = session?.user?.id
     if (!userId) {
       setProfileImage(null)
-      setDisplayName(session?.user?.name || "")
+      setDisplayName(role === "admin" ? session?.user?.name || "" : "")
       return
     }
 
@@ -105,12 +103,12 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
         const lastName = data.data?.personalData?.lastName?.trim?.() || ""
         const nextDisplayName = [firstName, lastName].filter(Boolean).join(" ").trim()
         setProfileImage(nextImage)
-        setDisplayName(nextDisplayName || session?.user?.name || "")
+        setDisplayName(nextDisplayName || (role === "admin" ? session?.user?.name || "" : ""))
         window.localStorage.setItem(cacheKey, nextImage ?? "")
       } catch (error) {
         if ((error as Error).name === "AbortError") return
         console.error("Failed to load header avatar:", error)
-        setDisplayName(session?.user?.name || "")
+        setDisplayName(role === "admin" ? session?.user?.name || "" : "")
       }
     }
 
@@ -121,7 +119,7 @@ export function Header({ showRecordsNav = false, hidePrivilegedNav = false }: He
       controller.abort()
       window.removeEventListener("profile-avatar-updated", syncAvatar)
     }
-  }, [session?.user?.id, session?.user?.name])
+  }, [session?.user?.id, session?.user?.name, role])
 
   useEffect(() => {
     if (!session?.user?.id) return

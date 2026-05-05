@@ -4,7 +4,7 @@ import clientPromise from "@/lib/db"
 
 export async function registerUser(request: NextRequest) {
   try {
-    let { username, email, password, confirmPassword, role } = await request.json()
+    let { username, email, password, confirmPassword } = await request.json()
 
     if (typeof username === "string") {
       username = username.trim().toLowerCase()
@@ -12,7 +12,7 @@ export async function registerUser(request: NextRequest) {
 
     const usernameRegex = /^[a-z0-9_]+$/
 
-    if (!username || !email || !password || !confirmPassword || !role) {
+    if (!username || !email || !password || !confirmPassword) {
       return NextResponse.json(
         { error: "All fields are required" },
         { status: 400 }
@@ -61,7 +61,7 @@ export async function registerUser(request: NextRequest) {
       username,
       email,
       password: hashedPassword,
-      role,
+      role: "standard",
       createdAt: new Date(),
     })
 
