@@ -7,6 +7,14 @@ import { ObjectId } from "mongodb"
 
 const DATABASE_NAME = "healthcare"
 
+function isValidApiKey(request: NextRequest) {
+  const configuredKey = process.env.AUDIT_LOGS_API_KEY || process.env.AUTH_SUBSYSTEM_API_KEY
+  if (!configuredKey) return false
+
+  const apiKey = request.headers.get("x-api-key")
+  return apiKey === configuredKey
+}
+
 async function requireAdminSession() {
   const session = await getServerSession(authConfig)
   const userId = (session?.user as any)?.id as string | undefined
@@ -21,9 +29,11 @@ async function requireAdminSession() {
 
 export async function listAuditLogs(request: NextRequest) {
   try {
-    const session = await requireAdminSession()
-    if (!session) {
-      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    const hasApiKey = isValidApiKey(request)
+    const session = hasApiKey ? null : await requireAdminSession()
+
+    if (!hasApiKey && !session) {
+      return NextResponse.json({ error: "Valid API key required" }, { status: 403 })
     }
 
     const client = await clientPromise
