@@ -9,10 +9,21 @@ const DATABASE_NAME = "healthcare"
 
 function isValidApiKey(request: NextRequest) {
   const configuredKey = process.env.AUDIT_LOGS_API_KEY || process.env.AUTH_SUBSYSTEM_API_KEY
-  if (!configuredKey) return false
-
   const apiKey = request.headers.get("x-api-key")
-  return apiKey === configuredKey
+
+  if (!configuredKey) {
+    return "missing-config"
+  }
+
+  if (!apiKey) {
+    return "missing-header"
+  }
+
+  if (apiKey !== configuredKey) {
+    return "invalid-key"
+  }
+
+  return "valid"
 }
 
 async function requireAdminSession() {
@@ -29,10 +40,26 @@ async function requireAdminSession() {
 
 export async function listAuditLogs(request: NextRequest) {
   try {
-    const hasApiKey = isValidApiKey(request)
+    const apiKeyStatus = isValidApiKey(request)
+    const hasApiKey = apiKeyStatus === "valid"
     const session = hasApiKey ? null : await requireAdminSession()
 
     if (!hasApiKey && !session) {
+      if (apiKeyStatus === "missing-config") {
+        return NextResponse.json(
+          { error: "API key is not configured in this deployment" },
+          { status: 500 }
+        )
+      }
+
+      if (apiKeyStatus === "missing-header") {
+        return NextResponse.json({ error: "Missing x-api-key header" }, { status: 403 })
+      }
+
+      if (apiKeyStatus === "invalid-key") {
+        return NextResponse.json({ error: "Invalid API key" }, { status: 403 })
+      }
+
       return NextResponse.json({ error: "Valid API key required" }, { status: 403 })
     }
 
