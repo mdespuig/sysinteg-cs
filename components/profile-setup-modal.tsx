@@ -770,7 +770,7 @@ function ReviewItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="break-words text-sm font-medium text-foreground">{value || "N/A"}</p>
+      <p className="wrap-break-word text-sm font-medium text-foreground">{value || "N/A"}</p>
     </div>
   )
 }
