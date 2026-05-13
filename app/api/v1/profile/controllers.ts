@@ -5,9 +5,11 @@ import { authConfig } from "@/auth"
 import clientPromise from "@/lib/db"
 
 const COLLECTION = "profile"
+const USERS_COLLECTION = "users"
 const PHONE_PREFIX = "+639"
 const PHONE_DIGIT_LIMIT = 9
 const PHONE_PREFIX_DIGITS = PHONE_PREFIX.replace(/\D/g, "")
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const isValidObjectId = (value: string) =>
   ObjectId.isValid(value) && String(new ObjectId(value)) === value
@@ -55,9 +57,9 @@ export async function getProfile() {
     const db = client.db("healthcare")
     const [profile, user] = await Promise.all([
       db.collection(COLLECTION).findOne({ userId: auth.userId }),
-      db.collection("users").findOne(
+      db.collection(USERS_COLLECTION).findOne(
         { _id: new ObjectId(auth.userId) },
-        { projection: { email: 1 } }
+        { projection: { email: 1, username: 1 } }
       ),
     ])
 
@@ -66,7 +68,8 @@ export async function getProfile() {
         data: profile
           ? {
               ...profile,
-              email: profile.email ?? user?.email ?? null,
+              email: user?.email ?? null,
+              username: user?.username ?? null,
             }
           : null,
       },
@@ -108,13 +111,7 @@ export async function updateProfile(request: NextRequest) {
     const client = await clientPromise
     const db = client.db("healthcare")
     const profiles = db.collection(COLLECTION)
-    const [existingProfile, user] = await Promise.all([
-      profiles.findOne({ userId: auth.userId }),
-      db.collection("users").findOne(
-        { _id: new ObjectId(auth.userId) },
-        { projection: { email: 1 } }
-      ),
-    ])
+    const existingProfile = await profiles.findOne({ userId: auth.userId })
 
     if (cropMode && !existingProfile?.profileImage) {
       return NextResponse.json(
@@ -132,7 +129,6 @@ export async function updateProfile(request: NextRequest) {
           $set: {
             userId: auth.userId,
             profileImage,
-            email: user?.email ?? existingProfile?.email ?? null,
             updatedAt: now,
           },
           $setOnInsert: {
@@ -153,6 +149,7 @@ export async function updateProfile(request: NextRequest) {
     const normalizedEmergencyContactNumber = isStaff
       ? null
       : normalizePhoneNumber(emergencyContact?.contactNumber)
+    const email = typeof personalData?.email === "string" ? personalData.email.trim().toLowerCase() : ""
 
     if (!normalizedPersonalContactNumber || (!isStaff && !normalizedEmergencyContactNumber)) {
       return NextResponse.json(
@@ -161,10 +158,13 @@ export async function updateProfile(request: NextRequest) {
       )
     }
 
+    if (!email || !EMAIL_REGEX.test(email)) {
+      return NextResponse.json({ error: "Valid email is required" }, { status: 400 })
+    }
+
     const setData: Record<string, unknown> = {
       userId: auth.userId,
       profileImage,
-      email: user?.email ?? existingProfile?.email ?? null,
       updatedAt: now,
     }
 
@@ -172,6 +172,15 @@ export async function updateProfile(request: NextRequest) {
       ...personalData,
       contactNumber: normalizedPersonalContactNumber,
     }
+    await db.collection(USERS_COLLECTION).updateOne(
+      { _id: new ObjectId(auth.userId) },
+      {
+        $set: {
+          email,
+          updatedAt: now,
+        },
+      }
+    )
     if (!isStaff && normalizedEmergencyContactNumber) {
       setData.emergencyContact = {
         ...emergencyContact,
@@ -193,7 +202,15 @@ export async function updateProfile(request: NextRequest) {
 
     const savedProfile = await profiles.findOne({ userId: auth.userId })
     return NextResponse.json(
-      { message: "Profile saved successfully", data: savedProfile },
+      {
+        message: "Profile saved successfully",
+        data: savedProfile
+          ? {
+              ...savedProfile,
+              email,
+            }
+          : null,
+      },
       { status: 200 }
     )
   } catch (error) {

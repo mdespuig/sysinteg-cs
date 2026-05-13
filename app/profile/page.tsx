@@ -30,6 +30,7 @@ interface PersonalData {
   gender: string
   birthdate: string
   contactNumber: string
+  email: string
   address: string
 }
 
@@ -44,6 +45,10 @@ interface ProfileData {
   profileImage: string | null
   personalData: PersonalData
   emergencyContact: EmergencyContact
+}
+
+type ProfileResponse = Partial<ProfileData> & {
+  email?: string | null
 }
 
 const PHONE_PREFIX = "+639"
@@ -98,7 +103,7 @@ const createDefaultAvatarDataUrl = (label: string) => {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
 
-const normalizeProfileData = (profile?: Partial<ProfileData> | null): ProfileData => ({
+const normalizeProfileData = (profile?: ProfileResponse | null): ProfileData => ({
   profileImage: profile?.profileImage ?? null,
   personalData: {
     firstName: profile?.personalData?.firstName ?? "",
@@ -106,6 +111,7 @@ const normalizeProfileData = (profile?: Partial<ProfileData> | null): ProfileDat
     gender: profile?.personalData?.gender ?? "",
     birthdate: profile?.personalData?.birthdate ?? "",
     contactNumber: extractPhoneDigits(profile?.personalData?.contactNumber ?? ""),
+    email: profile?.email ?? profile?.personalData?.email ?? "",
     address: profile?.personalData?.address ?? "",
   },
   emergencyContact: {
@@ -138,6 +144,7 @@ export default function ProfilePage() {
       gender: "",
       birthdate: "",
       contactNumber: "",
+      email: "",
       address: "",
     },
     emergencyContact: {
@@ -402,6 +409,11 @@ export default function ProfilePage() {
       newErrors.personalData.contactNumber = "Contact number must contain exactly 9 digits after +639"
       phoneErrorMessage = "Contact number must contain exactly 9 digits after +639"
     }
+    if (!profileData.personalData.email.trim()) {
+      newErrors.personalData.email = "Email is required"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileData.personalData.email.trim())) {
+      newErrors.personalData.email = "Enter a valid email address"
+    }
     if (!profileData.personalData.address.trim()) newErrors.personalData.address = "Address is required"
 
     if (showEmergencyContact) {
@@ -444,6 +456,7 @@ export default function ProfilePage() {
         profileImage: profileData.profileImage,
         personalData: {
           ...profileData.personalData,
+          email: profileData.personalData.email.trim(),
           contactNumber: `${PHONE_PREFIX}${profileData.personalData.contactNumber}`,
         },
       }
@@ -776,6 +789,17 @@ export default function ProfilePage() {
                           />
                         </div>
                         <AnimatedError message={errors.personalData.contactNumber} className="text-sm text-destructive" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="personal-email">Email</Label>
+                        <Input
+                          id="personal-email"
+                          type="email"
+                          value={profileData.personalData.email}
+                          onChange={(e) => updatePersonalData("email", e.target.value)}
+                          className={errors.personalData.email ? "border-destructive" : ""}
+                        />
+                        <AnimatedError message={errors.personalData.email} className="text-sm text-destructive" />
                       </div>
                     </div>
                     <div className="space-y-2">

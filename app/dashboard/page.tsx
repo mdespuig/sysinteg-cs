@@ -44,6 +44,7 @@ export default function DashboardPage() {
   const [announcementConfirmOpen, setAnnouncementConfirmOpen] = useState(false)
   const [announcementTarget, setAnnouncementTarget] = useState<AnnouncementAudienceExtended>("all")
   const [profileAvatar, setProfileAvatar] = useState<string | null>(null)
+  const [profileEmail, setProfileEmail] = useState<string | null>(null)
   const [counts, setCounts] = useState<InquiryCounts>({
     total: 0,
     pending: 0,
@@ -72,6 +73,38 @@ export default function DashboardPage() {
       setProfileAvatar(cachedAvatar || null)
     }
   }, [session?.user])
+
+  useEffect(() => {
+    if (status !== "authenticated") return
+
+    let isActive = true
+
+    const loadProfileEmail = async () => {
+      try {
+        const res = await fetch("/api/v1/profile", { credentials: "include" })
+        const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to load profile")
+        }
+
+        if (isActive) {
+          setProfileEmail(data.data?.email ?? null)
+        }
+      } catch (error) {
+        console.error("Failed to load profile email:", error)
+        if (isActive) {
+          setProfileEmail(null)
+        }
+      }
+    }
+
+    void loadProfileEmail()
+
+    return () => {
+      isActive = false
+    }
+  }, [status])
 
   useEffect(() => {
     const handleAvatarUpdated = (event: Event) => {
@@ -253,7 +286,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">{session?.user?.email}</p>
+                  <p className="font-medium">{profileEmail || "Not set"}</p>
                 </div>
               </div>
               <div className="mt-auto pt-4">
