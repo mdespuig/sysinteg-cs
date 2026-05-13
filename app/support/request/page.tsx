@@ -67,6 +67,7 @@ export default function RequestInquiryPage() {
   const { data: session, status } = useSession()
   const isMountedRef = useRef(true)
   const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const profileInfoControllerRef = useRef<AbortController | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [generatedId, setGeneratedId] = useState("")
@@ -130,6 +131,7 @@ export default function RequestInquiryPage() {
 
   const handleFillInformationFieldsChange = async (checked: boolean | "indeterminate") => {
     if (checked !== true) {
+      profileInfoControllerRef.current?.abort()
       setFillInformationFields(false)
       clearAutoFilledFields()
       return
@@ -142,12 +144,17 @@ export default function RequestInquiryPage() {
 
     setFillInformationFields(true)
     setIsLoadingProfileInfo(true)
+    profileInfoControllerRef.current?.abort()
+    const controller = new AbortController()
+    profileInfoControllerRef.current = controller
 
     try {
-      const response = await fetch(`/api/v1/profile?userId=${session.user.id}`)
+      const response = await fetch("/api/v1/profile", {
+        signal: controller.signal,
+      })
       const data = await response.json().catch(() => ({}))
 
-      if (!isMountedRef.current) return
+      if (!isMountedRef.current || controller.signal.aborted) return
 
       const contactNumber =
         typeof data?.data?.personalData?.contactNumber === "string"
@@ -183,12 +190,16 @@ export default function RequestInquiryPage() {
       }))
       setFillInformationFields(true)
     } catch (error) {
+      if ((error as Error).name === "AbortError") return
       if (!isMountedRef.current) return
       console.error("Failed to load profile information:", error)
       toast.error("Failed to load profile information")
       setFillInformationFields(false)
       clearAutoFilledFields()
     } finally {
+      if (profileInfoControllerRef.current === controller) {
+        profileInfoControllerRef.current = null
+      }
       if (isMountedRef.current) {
         setIsLoadingProfileInfo(false)
       }
@@ -285,6 +296,7 @@ export default function RequestInquiryPage() {
   useEffect(() => {
     return () => {
       isMountedRef.current = false
+      profileInfoControllerRef.current?.abort()
       if (copyResetTimeoutRef.current) {
         clearTimeout(copyResetTimeoutRef.current)
       }

@@ -72,20 +72,31 @@ export function NotificationMenu() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const isMountedRef = useRef(true)
+  const controllerRef = useRef<AbortController | null>(null)
 
   const loadNotifications = useCallback(async () => {
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
+
     try {
       const response = await fetch("/api/v1/notifications", {
         credentials: "include",
         cache: "no-store",
+        signal: controller.signal,
       })
       const payload = await response.json()
-      if (!response.ok || !isMountedRef.current) return
+      if (!response.ok || controller.signal.aborted || !isMountedRef.current) return
 
       setNotifications(payload.data || [])
       setUnreadCount(payload.unreadCount || 0)
-    } catch {
+    } catch (error) {
+      if ((error as Error).name === "AbortError") return
       return
+    } finally {
+      if (controllerRef.current === controller) {
+        controllerRef.current = null
+      }
     }
   }, [])
 
@@ -98,6 +109,7 @@ export function NotificationMenu() {
     window.addEventListener("focus", refresh)
     return () => {
       isMountedRef.current = false
+      controllerRef.current?.abort()
       window.clearInterval(interval)
       window.removeEventListener("focus", refresh)
     }

@@ -36,6 +36,7 @@ type AnnouncementAudienceExtended = AnnouncementAudience | "all"
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const userId = (session?.user as any)?.id as string | undefined
   const role = (session?.user as any)?.role
   const isAdmin = role === "admin"
   const canViewRecords = role === "admin" || role === "staff"
@@ -58,13 +59,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (status !== "authenticated") return
-    if ((session?.user as any)?.role === "standard") {
+    if (role === "standard") {
       router.replace("/")
     }
-  }, [status, session?.user, router])
+  }, [status, role, router])
 
   useEffect(() => {
-    const userId = (session?.user as any)?.id as string | undefined
     if (!userId) return
 
     const cacheKey = `profile-avatar:${userId}`
@@ -72,16 +72,27 @@ export default function DashboardPage() {
     if (cachedAvatar !== null) {
       setProfileAvatar(cachedAvatar || null)
     }
-  }, [session?.user])
+  }, [userId])
 
   useEffect(() => {
     if (status !== "authenticated") return
 
     let isActive = true
+    const controller = new AbortController()
+    if (userId) {
+      const cacheKey = `profile-email:${userId}`
+      const cachedEmail = window.localStorage.getItem(cacheKey)
+      if (cachedEmail !== null) {
+        setProfileEmail(cachedEmail || null)
+      }
+    }
 
     const loadProfileEmail = async () => {
       try {
-        const res = await fetch("/api/v1/profile", { credentials: "include" })
+        const res = await fetch("/api/v1/profile", {
+          credentials: "include",
+          signal: controller.signal,
+        })
         const data = await res.json()
 
         if (!res.ok) {
@@ -89,9 +100,17 @@ export default function DashboardPage() {
         }
 
         if (isActive) {
-          setProfileEmail(data.data?.email ?? null)
+          const nextEmail =
+            data.data?.email ??
+            data.data?.personalData?.email ??
+            null
+          setProfileEmail(nextEmail)
+          if (userId) {
+            window.localStorage.setItem(`profile-email:${userId}`, nextEmail || "")
+          }
         }
       } catch (error) {
+        if ((error as Error).name === "AbortError") return
         console.error("Failed to load profile email:", error)
         if (isActive) {
           setProfileEmail(null)
@@ -103,20 +122,20 @@ export default function DashboardPage() {
 
     return () => {
       isActive = false
+      controller.abort()
     }
-  }, [status])
+  }, [status, userId])
 
   useEffect(() => {
     const handleAvatarUpdated = (event: Event) => {
       const detail = (event as CustomEvent<{ userId?: string; profileImage?: string | null }>).detail
-      const userId = (session?.user as any)?.id as string | undefined
       if (!detail || !userId || detail.userId !== userId) return
       setProfileAvatar(detail.profileImage ?? null)
     }
 
     window.addEventListener("profile-avatar-updated", handleAvatarUpdated as EventListener)
     return () => window.removeEventListener("profile-avatar-updated", handleAvatarUpdated as EventListener)
-  }, [session?.user])
+  }, [userId])
 
   useEffect(() => {
     if (!canViewRecords) return

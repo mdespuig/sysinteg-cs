@@ -65,13 +65,11 @@ export async function getProfile() {
 
     return NextResponse.json(
       {
-        data: profile
-          ? {
-              ...profile,
-              email: user?.email ?? null,
-              username: user?.username ?? null,
-            }
-          : null,
+        data: {
+          ...(profile || { userId: auth.userId }),
+          email: user?.email ?? profile?.personalData?.email ?? null,
+          username: user?.username ?? null,
+        },
       },
       { status: 200 }
     )
@@ -88,6 +86,7 @@ export async function updateProfile(request: NextRequest) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
     const role = ((auth.session?.user as any)?.role || "") as string
+    const isAdmin = role === "admin"
     const isStaff = role === "staff"
 
     const body = await request.json()
@@ -104,7 +103,7 @@ export async function updateProfile(request: NextRequest) {
       return NextResponse.json({ error: "You can only update your own profile" }, { status: 403 })
     }
 
-    if (!avatarOnly && (!personalData || (!isStaff && !emergencyContact))) {
+    if (!avatarOnly && !personalData) {
       return NextResponse.json({ error: "Profile data is required" }, { status: 400 })
     }
 
@@ -149,13 +148,18 @@ export async function updateProfile(request: NextRequest) {
     const normalizedEmergencyContactNumber = isStaff
       ? null
       : normalizePhoneNumber(emergencyContact?.contactNumber)
-    const email = typeof personalData?.email === "string" ? personalData.email.trim().toLowerCase() : ""
+    const submittedEmail = typeof personalData?.email === "string" ? personalData.email.trim().toLowerCase() : ""
+    let email = submittedEmail
 
-    if (!normalizedPersonalContactNumber || (!isStaff && !normalizedEmergencyContactNumber)) {
-      return NextResponse.json(
-        { error: "Contact numbers must contain exactly 9 digits after +639" },
-        { status: 400 }
+    if (!email && !isAdmin) {
+      const existingUser = await db.collection(USERS_COLLECTION).findOne(
+        { _id: new ObjectId(auth.userId) },
+        { projection: { email: 1 } }
       )
+      email =
+        typeof existingUser?.email === "string" && existingUser.email.trim()
+          ? existingUser.email.trim().toLowerCase()
+          : String(auth.session?.user?.email || "").trim().toLowerCase()
     }
 
     if (!email || !EMAIL_REGEX.test(email)) {
@@ -168,23 +172,43 @@ export async function updateProfile(request: NextRequest) {
       updatedAt: now,
     }
 
-    setData.personalData = {
-      ...personalData,
-      contactNumber: normalizedPersonalContactNumber,
-    }
-    await db.collection(USERS_COLLECTION).updateOne(
-      { _id: new ObjectId(auth.userId) },
-      {
-        $set: {
-          email,
-          updatedAt: now,
-        },
+    if (isAdmin) {
+      await db.collection(USERS_COLLECTION).updateOne(
+        { _id: new ObjectId(auth.userId) },
+        {
+          $set: {
+            email,
+            updatedAt: now,
+          },
+        }
+      )
+    } else {
+      if (!normalizedPersonalContactNumber || (!isStaff && !normalizedEmergencyContactNumber)) {
+        return NextResponse.json(
+          { error: "Contact numbers must contain exactly 9 digits after +639" },
+          { status: 400 }
+        )
       }
-    )
-    if (!isStaff && normalizedEmergencyContactNumber) {
-      setData.emergencyContact = {
-        ...emergencyContact,
-        contactNumber: normalizedEmergencyContactNumber,
+
+      setData.personalData = {
+        ...personalData,
+        email,
+        contactNumber: normalizedPersonalContactNumber,
+      }
+      await db.collection(USERS_COLLECTION).updateOne(
+        { _id: new ObjectId(auth.userId) },
+        {
+          $set: {
+            email,
+            updatedAt: now,
+          },
+        }
+      )
+      if (!isStaff && normalizedEmergencyContactNumber) {
+        setData.emergencyContact = {
+          ...emergencyContact,
+          contactNumber: normalizedEmergencyContactNumber,
+        }
       }
     }
 

@@ -316,6 +316,7 @@ export const authConfig: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.name = user.name ?? token.name
+        token.email = user.email ?? token.email
         token.role = (user as any).role ?? token.role
         token.username = (user as any).username ?? token.username
       }
@@ -325,6 +326,7 @@ export const authConfig: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string
         session.user.name = (token.name as string) || session.user.name
+        session.user.email = (token.email as string) || session.user.email
         ;(session.user as any).role = token.role as string
         ;(session.user as any).username = token.username as string | undefined
       }

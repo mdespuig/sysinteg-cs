@@ -51,6 +51,10 @@ type ProfileResponse = Partial<ProfileData> & {
   email?: string | null
 }
 
+type AdminProfileData = {
+  email: string
+}
+
 const PHONE_PREFIX = "+639"
 const PHONE_DIGIT_LIMIT = 9
 const PHONE_PREFIX_DIGITS = PHONE_PREFIX.replace(/\D/g, "")
@@ -135,6 +139,10 @@ export default function ProfilePage() {
   const [isSavingAvatar, setIsSavingAvatar] = useState(false)
   const [imageError, setImageError] = useState("")
   const [useDefaultAvatarPreview, setUseDefaultAvatarPreview] = useState(false)
+  const [adminProfileData, setAdminProfileData] = useState<AdminProfileData>({
+    email: "",
+  })
+  const [adminEmailError, setAdminEmailError] = useState("")
 
   const [profileData, setProfileData] = useState<ProfileData>({
     profileImage: null,
@@ -167,6 +175,14 @@ export default function ProfilePage() {
       }))
     }
   }, [session?.user?.id])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    setAdminProfileData((prev) => ({
+      ...prev,
+      email: session?.user?.email || "",
+    }))
+  }, [isAdmin, session?.user?.email])
 
   const [errors, setErrors] = useState<{
     personalData: Partial<Record<keyof PersonalData, string>>
@@ -204,6 +220,11 @@ export default function ProfilePage() {
             })
           )
           setProfileData(normalizeProfileData({ ...data.data, profileImage: nextImage }))
+          if (isAdmin) {
+            setAdminProfileData({
+              email: data.data.email ?? data.data.personalData?.email ?? "",
+            })
+          }
         }
       } catch (error) {
         if ((error as Error).name === "AbortError") return
@@ -243,9 +264,10 @@ export default function ProfilePage() {
     const reader = new FileReader()
     reader.onloadend = () => {
       setUseDefaultAvatarPreview(false)
+      const nextImage = reader.result as string
       setProfileData((prev) => ({
         ...prev,
-        profileImage: reader.result as string,
+        profileImage: nextImage,
       }))
     }
     reader.readAsDataURL(file)
@@ -256,6 +278,49 @@ export default function ProfilePage() {
     setUseDefaultAvatarPreview(true)
     setImageError("")
     if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  const updateAdminEmail = (value: string) => {
+    setAdminProfileData((prev) => ({ ...prev, email: value }))
+    if (adminEmailError) {
+      setAdminEmailError("")
+    }
+  }
+
+  const handleAdminEmailSave = async () => {
+    if (!isAdmin) return
+    if (!validateForm()) return
+
+    setIsSaving(true)
+
+    try {
+      const response = await fetch("/api/v1/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileImage: profileData.profileImage,
+          personalData: {
+            email: adminProfileData.email.trim(),
+          },
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "Failed to save profile")
+
+      if (data.data) {
+        setAdminProfileData((prev) => ({
+          ...prev,
+          email: data.data?.email ?? data.data?.personalData?.email ?? prev.email,
+        }))
+      }
+      toast.success("Profile saved successfully!")
+    } catch (error) {
+      console.error("Profile save failed:", error)
+      toast.error("Failed to save profile")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const updatePersonalData = (field: keyof PersonalData, value: string) => {
@@ -386,6 +451,15 @@ export default function ProfilePage() {
 
   const validateForm = () => {
     if (isAdmin) {
+      if (!adminProfileData.email.trim()) {
+        setAdminEmailError("Email is required")
+        return false
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminProfileData.email.trim())) {
+        setAdminEmailError("Enter a valid email address")
+        return false
+      }
+      setAdminEmailError("")
       setErrors({
         personalData: {},
         emergencyContact: {},
@@ -466,6 +540,11 @@ export default function ProfilePage() {
           contactNumber: `${PHONE_PREFIX}${profileData.emergencyContact.contactNumber}`,
         }
       }
+      if (isAdmin) {
+        payload.personalData = {
+          email: adminProfileData.email.trim(),
+        }
+      }
 
       const response = await fetch("/api/v1/profile", {
         method: "PUT",
@@ -485,6 +564,12 @@ export default function ProfilePage() {
             detail: { userId: session.user.id, profileImage: nextImage },
           })
         )
+      }
+      if (isAdmin) {
+        setAdminProfileData((prev) => ({
+          ...prev,
+          email: data.data?.email ?? data.data?.personalData?.email ?? prev.email,
+        }))
       }
       toast.success("Profile saved successfully!")
     } catch (error) {
@@ -891,12 +976,48 @@ export default function ProfilePage() {
               </Card>
             )}
             {isAdmin && (
-              <Card className="mt-6">
-                <CardContent className="pt-6">
-                  <div className="rounded-lg border bg-muted/30 p-4">
-                    <p className="text-sm text-muted-foreground">
-                      Admins can only modify their avatar icon.
-                    </p>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5 text-primary" />
+                    Admin Profile
+                  </CardTitle>
+                  <CardDescription>
+                    Update your account email.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="admin-email">Email</Label>
+                    <Input
+                      id="admin-email"
+                      type="email"
+                      value={adminProfileData.email}
+                      onChange={(e) => updateAdminEmail(e.target.value)}
+                      className={adminEmailError ? "border-destructive" : ""}
+                    />
+                    <AnimatedError message={adminEmailError} className="text-sm text-destructive" />
+                  </div>
+
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      onClick={() => void handleAdminEmailSave()}
+                      disabled={isSaving || isSavingAvatar}
+                      className="w-full cursor-pointer hover:bg-[#006AEE] hover:text-white"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

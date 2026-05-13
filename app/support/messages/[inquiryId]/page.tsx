@@ -222,6 +222,8 @@ export default function InquiryMessagesPage() {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const typingTimeoutRef = useRef<number | null>(null)
   const typingActiveRef = useRef(false)
+  const isMountedRef = useRef(true)
+  const conversationControllerRef = useRef<AbortController | null>(null)
 
   if (status === "unauthenticated") {
     redirect("/auth/login")
@@ -246,6 +248,13 @@ export default function InquiryMessagesPage() {
   }, [])
 
   useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+      conversationControllerRef.current?.abort()
+    }
+  }, [])
+
+  useEffect(() => {
     if (status === "loading") return
     if (session && !canAccessConversation) {
       toast.error("You have no access to this conversation")
@@ -257,11 +266,16 @@ export default function InquiryMessagesPage() {
     async (showLoader = false) => {
       if (!inquiryId) return
 
+      conversationControllerRef.current?.abort()
+      const controller = new AbortController()
+      conversationControllerRef.current = controller
+
       try {
-        if (showLoader) setLoading(true)
+        if (showLoader && isMountedRef.current) setLoading(true)
         const res = await fetch(`/api/v1/conversations?inquiryId=${encodeURIComponent(inquiryId)}`, {
           credentials: "include",
           cache: "no-store",
+          signal: controller.signal,
         })
         const payload = await res.json()
 
@@ -270,6 +284,8 @@ export default function InquiryMessagesPage() {
         }
 
         const nextMessages = payload.data.messages || []
+        if (controller.signal.aborted || !isMountedRef.current) return
+
         setData(payload.data)
         setPeerTyping(Boolean(payload.data.typing?.isPeerTyping))
         setMessages((current) => {
@@ -282,13 +298,18 @@ export default function InquiryMessagesPage() {
         })
         setError("")
       } catch (err) {
+        if ((err as Error).name === "AbortError") return
+        if (!isMountedRef.current) return
         setError(err instanceof Error ? err.message : "Failed to load conversation")
         if (showLoader) {
           setData(null)
           setMessages([])
         }
       } finally {
-        if (showLoader) setLoading(false)
+        if (conversationControllerRef.current === controller) {
+          conversationControllerRef.current = null
+        }
+        if (isMountedRef.current && !controller.signal.aborted) setLoading(false)
       }
     },
     [inquiryId]
@@ -328,17 +349,20 @@ export default function InquiryMessagesPage() {
   useEffect(() => {
     if (!data?.conversation.socketEndpoint) return
 
+    let isActive = true
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
     const socketUrl = `${protocol}//${window.location.host}${data.conversation.socketEndpoint}`
     const socket = new WebSocket(socketUrl)
     socketRef.current = socket
 
     socket.onopen = () => {
+      if (!isActive) return
       setSocketState("connected")
       socket.send(JSON.stringify({ type: "conversation.subscribe", inquiryId }))
     }
 
     socket.onmessage = (event) => {
+      if (!isActive) return
       try {
         const payload = JSON.parse(event.data)
         if (payload.type === "conversation.message.created" && payload.message) {
@@ -353,14 +377,20 @@ export default function InquiryMessagesPage() {
     }
 
     socket.onerror = () => {
+      if (!isActive) return
       setSocketState("polling")
     }
 
     socket.onclose = () => {
+      if (!isActive) return
       setSocketState((current) => (current === "connected" ? "polling" : current))
     }
 
     return () => {
+      isActive = false
+      if (socketRef.current === socket) {
+        socketRef.current = null
+      }
       socket.close()
     }
   }, [data?.conversation.socketEndpoint, inquiryId])
@@ -370,7 +400,7 @@ export default function InquiryMessagesPage() {
 
     const interval = window.setInterval(() => {
       void loadConversation()
-    }, 1000)
+    }, 5000)
 
     return () => window.clearInterval(interval)
   }, [status, canAccessConversation, socketState, loadConversation])
@@ -380,6 +410,7 @@ export default function InquiryMessagesPage() {
 
     const sendPresenceHeartbeat = async () => {
       try {
+        if (document.visibilityState === "hidden") return
         await fetch("/api/v1/presence", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -394,11 +425,12 @@ export default function InquiryMessagesPage() {
 
     void sendPresenceHeartbeat()
     const refreshOnFocus = () => {
+      if (document.visibilityState === "hidden") return
       void sendPresenceHeartbeat()
       void loadConversation()
     }
 
-    const heartbeatInterval = window.setInterval(sendPresenceHeartbeat, 3000)
+    const heartbeatInterval = window.setInterval(sendPresenceHeartbeat, 10000)
     window.addEventListener("focus", refreshOnFocus)
     document.addEventListener("visibilitychange", refreshOnFocus)
 

@@ -298,7 +298,7 @@ export function ProfileSetupModal() {
       isActive = false
       controller.abort()
     }
-  }, [isStandard, pathname, showModalForRole, status])
+  }, [isStandard, pathname, showModalForRole, status, userId])
 
   const updatePersonalData = (field: keyof PersonalData, value: string) => {
     const nextValue = field === "firstName" || field === "lastName" ? toCapitalizedName(value) : value
